@@ -1,0 +1,22 @@
+{
+  "name": "kibo360-project-hub",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Internal project management application for Livexpert Technologies Pvt. Ltd.",
+  "scripts": {
+    "install:all": "npm --prefix backend install && npm --prefix frontend install",
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"magenta,blue\" \"npm --prefix backend run dev\" \"npm --prefix frontend run dev\"",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "typecheck": "npm --prefix backend run typecheck && npm --prefix frontend run typecheck"
+  },
+  "devDependencies": {
+    "@types/selfsigned": "^2.0.4",
+    "concurrently": "^9.1.2",
+    "dotenv": "^18.0.9",
+    "selfsigned": "^5.5.0"
+  }
+}

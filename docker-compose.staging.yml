@@ -1,0 +1,90 @@
+# ==============================================================================
+# KIBO360 Project Hub — Staging Docker Compose Orchestration
+# Livexpert Technologies Pvt. Ltd.
+# Used for pre-release validation and QA verification before production deploy.
+# ==============================================================================
+
+version: "3.8"
+
+services:
+  # 1. Staging PostgreSQL Database
+  postgres-staging:
+    image: postgres:16-alpine
+    container_name: kibo360-staging-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: kibo360_staging
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:-StagingPostgres2026Secure!}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - kibo360_staging_pgdata:/var/lib/postgresql/data
+      - ./deployment/scripts/init-prod-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - kibo360-staging-net
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d kibo360_staging"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # 2. Staging Node.js Backend API (Port 5001)
+  backend-staging:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kibo360-staging-backend
+    restart: always
+    depends_on:
+      postgres-staging:
+        condition: service_healthy
+    env_file:
+      - .env.staging
+    environment:
+      NODE_ENV: production
+      PORT: 5001
+      DATABASE_URL: postgresql://postgres:${STAGING_POSTGRES_PASSWORD:-StagingPostgres2026Secure!}@postgres-staging:5432/kibo360_staging?schema=public
+      FRONTEND_URL: http://localhost:5174
+      CORS_ORIGIN: http://localhost:5174
+    networks:
+      - kibo360-staging-net
+    ports:
+      - "127.0.0.1:5001:5001"
+    volumes:
+      - staging_logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5001/api/v1/health/liveness || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # 3. Staging Frontend SPA (Port 5174)
+  frontend-staging:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5001/api/v1
+    container_name: kibo360-staging-frontend
+    restart: always
+    depends_on:
+      backend-staging:
+        condition: service_healthy
+    ports:
+      - "5174:80"
+    networks:
+      - kibo360-staging-net
+
+networks:
+  kibo360-staging-net:
+    driver: bridge
+
+volumes:
+  kibo360_staging_pgdata:
+    name: kibo360_staging_pgdata
+  staging_logs:
+    name: kibo360_staging_logs

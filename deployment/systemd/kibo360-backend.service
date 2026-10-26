@@ -1,0 +1,43 @@
+# ==============================================================================
+# KIBO360 Project Hub — Systemd Service Unit
+# Livexpert Technologies Pvt. Ltd.
+# Path: /etc/systemd/system/kibo360-backend.service
+# ==============================================================================
+
+[Unit]
+Description=KIBO360 Project Hub API Server
+Documentation=https://github.com/livexpert/kibo360-project-hub
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=kibo360
+Group=kibo360
+WorkingDirectory=/var/www/kibo360/backend
+ExecStart=/usr/bin/node dist/src/index.js
+Restart=always
+RestartSec=10
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+# Environment configuration
+EnvironmentFile=/var/www/kibo360/backend/.env
+Environment=NODE_ENV=production
+
+# Resource ceilings and security isolation
+MemoryMax=1G
+CPUQuota=200%
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kibo360-backend
+
+[Install]
+WantedBy=multi-user.target
