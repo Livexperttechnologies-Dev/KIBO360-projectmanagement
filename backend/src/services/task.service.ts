@@ -9,6 +9,9 @@ import { TokenPayload } from "./auth.service";
 import { AuditService } from "./audit.service";
 import { ProjectService } from "./project.service";
 import { notificationService } from "./notification.service";
+import fs from "fs";
+import path from "path";
+import { uploadDirectory } from "../middleware/upload";
 
 export interface TaskFilters {
   projectId?: string;
@@ -475,8 +478,24 @@ export class TaskService {
       throw error;
     }
 
+    const reviewStatus = task.status === "IN_REVIEW" || task.status === "UNDER_REVIEW";
+    const isReviewDecision = reviewStatus && (updates.status === "COMPLETED" || updates.status === "CHANGES_REQUIRED");
+    const canDecideReview =
+      user.role === "ADMINISTRATOR" || user.role === "PROJECT_MANAGER" || task.reviewerId === user.userId;
+    if (isReviewDecision && !canDecideReview) {
+      const error: any = new Error("Only an administrator, project manager, or the assigned reviewer can decide a task review");
+      error.statusCode = 403;
+      throw error;
+    }
+
     // Permission check
-    const permission = this.canEditTaskFields(task, user, updates);
+    const reviewerStatusOnly =
+      isReviewDecision &&
+      (task.reviewerId === user.userId || user.role === "PROJECT_MANAGER") &&
+      Object.keys(updates).every((field) => field === "status" || field === "completionPercentage");
+    const permission = reviewerStatusOnly
+      ? { allowed: true }
+      : this.canEditTaskFields(task, user, updates);
     if (!permission.allowed) {
       const error: any = new Error(permission.reason || "Forbidden: Cannot update this task");
       error.statusCode = 403;
@@ -871,7 +890,25 @@ export class TaskService {
       throw error;
     }
 
-    return dbStore.deleteTaskAttachment(attachmentId);
+    const deleted = dbStore.deleteTaskAttachment(attachmentId);
+    if (deleted) {
+      const storedFilename = path.basename(attachment.fileUrl);
+      await fs.promises.unlink(path.join(uploadDirectory, storedFilename)).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOENT") throw error;
+      });
+    }
+    return deleted;
+  }
+
+  public static getAttachmentForDownload(taskId: string, attachmentId: string, user: TokenPayload) {
+    const task = this.getTaskById(taskId, user);
+    const attachment = dbStore.taskAttachments.find((item) => item.id === attachmentId && item.taskId === taskId);
+    if (!attachment || (user.role === "EMPLOYEE" && task.assigneeId !== user.userId && attachment.accessScope === "ASSIGNEE_ONLY")) {
+      const error: any = new Error("Attachment not found");
+      error.statusCode = 404;
+      throw error;
+    }
+    return attachment;
   }
 
   /**

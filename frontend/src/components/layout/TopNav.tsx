@@ -157,7 +157,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onMenuClick }) => {
         {/* User Profile & Sign Out */}
         {user ? (
           <div className="flex items-center gap-3 border-l border-slate-200 pl-3">
-            <div className="flex items-center gap-2">
+            <Link to="/profile" className="flex items-center gap-2 rounded-lg p-1 hover:bg-slate-50" title="Open my profile">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-[#690BA8] to-[#E81778] text-white font-bold text-xs shadow-sm">
                 {initials}
               </div>
@@ -175,7 +175,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onMenuClick }) => {
                   )}
                 </div>
               </div>
-            </div>
+            </Link>
 
             <button
               onClick={() => logout()}

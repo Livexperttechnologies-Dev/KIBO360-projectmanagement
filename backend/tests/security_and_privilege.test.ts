@@ -118,8 +118,8 @@ describe("Phase 9 — Security, Authentication & Privilege Escalation Audit Suit
     });
     assert.equal(archiveRes.status, 403, "Employee cannot archive projects");
 
-    // 2c. Employee attempting to invite a user -> 403
-    const inviteRes = await fetch(`${BASE_URL}/users/invite`, {
+    // 2c. Employee attempting to create a user -> 403
+    const createUserRes = await fetch(`${BASE_URL}/users`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${devToken}`,
@@ -129,10 +129,12 @@ describe("Phase 9 — Security, Authentication & Privilege Escalation Audit Suit
         email: "hacker@livexpert.in",
         firstName: "Malicious",
         lastName: "Actor",
+        password: "NotAllowed#2026",
         role: "ADMINISTRATOR",
+        departmentId: "dept-sw",
       }),
     });
-    assert.equal(inviteRes.status, 403, "Employee cannot invite users");
+    assert.equal(createUserRes.status, 403, "Employee cannot create users");
 
     // 2d. Employee attempting to export report CSV -> 403
     const exportRes = await fetch(`${BASE_URL}/reports/export/tasks`, {
@@ -205,49 +207,21 @@ describe("Phase 9 — Security, Authentication & Privilege Escalation Audit Suit
     });
   });
 
-  // 4. Password-Reset Token Expiration & Replay Defense
-  test("4. Password-Reset: Token expires, prevents replay, and rejects invalid tokens", async () => {
-    const testEmail = "lead@livexpert.in";
-
-    // 4a. Request password reset
+  // 4. Email Password-Reset Removal
+  test("4. Password-Reset: rejects legacy email links and tokens", async () => {
     const reqRes = await fetch(`${BASE_URL}/auth/forgot-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: testEmail }),
+      body: JSON.stringify({ email: "lead@livexpert.in" }),
     });
-    const reqData = (await reqRes.json()) as any;
-    assert.equal(reqRes.status, 200);
-    assert.ok(reqData.success);
+    assert.equal(reqRes.status, 404);
 
-    // Retrieve debug token emitted in non-production test environment
-    const rawResetToken = reqData.debugToken || reqData.data?.debugToken;
-    assert.ok(rawResetToken, "Debug token must be returned in development/test environment");
-
-    // 4b. Reject invalid / malformed token
     const invalidTokenRes = await fetch(`${BASE_URL}/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: "invalid-token-12345", newPassword: "Livexpert@2026" }),
     });
-    assert.equal(invalidTokenRes.status, 400, "Invalid token must return 400 Bad Request");
-
-    // 4c. First use with valid token: Succeeds
-    const validResetRes = await fetch(`${BASE_URL}/auth/reset-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: rawResetToken, newPassword: "Livexpert@2026" }),
-    });
-    assert.equal(validResetRes.status, 200, "Valid token reset must return 200 OK");
-    const validResetData = (await validResetRes.json()) as any;
-    assert.ok(validResetData.success);
-
-    // 4d. Second use with same token (Replay attempt): Must be rejected!
-    const replayRes = await fetch(`${BASE_URL}/auth/reset-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: rawResetToken, newPassword: "Livexpert@2026" }),
-    });
-    assert.equal(replayRes.status, 400, "Used password reset token must be rejected with 400 upon replay");
+    assert.equal(invalidTokenRes.status, 400, "Legacy email reset tokens must be rejected");
   });
 
   // 5. Server-Side Input Validation Audit

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { NotificationController } from "../controllers/notification.controller";
-import { authenticate } from "../middleware/auth";
+import { authenticate, requireRole } from "../middleware/auth";
 
 const router = Router();
 
@@ -19,8 +19,8 @@ router.get("/preferences", NotificationController.getPreferences);
 router.patch("/preferences", NotificationController.updatePreferences);
 
 // Background jobs diagnostics & execution
-router.get("/jobs", NotificationController.listJobs);
-router.post("/jobs/:id/retry", NotificationController.retryJob);
-router.post("/jobs/run-worker", NotificationController.runWorker);
+router.get("/jobs", requireRole("ADMINISTRATOR"), NotificationController.listJobs);
+router.post("/jobs/:id/retry", requireRole("ADMINISTRATOR"), NotificationController.retryJob);
+router.post("/jobs/run-worker", requireRole("ADMINISTRATOR"), NotificationController.runWorker);
 
 export default router;

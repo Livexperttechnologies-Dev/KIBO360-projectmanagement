@@ -1,9 +1,9 @@
 /**
  * Configurable API client for KIBO360 Project Hub
- * Base URL is driven by VITE_API_URL or defaults to localhost:5000/api/v1
+ * Base URL is driven by VITE_API_URL or defaults to localhost:5002/api/v1
  */
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:5000/api/v1";
+const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:5002/api/v1";
 
 export interface ApiResponse<T = any> {
   data?: T;

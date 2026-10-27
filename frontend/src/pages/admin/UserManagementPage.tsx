@@ -13,6 +13,7 @@ import {
   Building2,
   RefreshCw,
   AlertTriangle,
+  KeyRound,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
@@ -39,24 +40,32 @@ export const UserManagementPage: React.FC = () => {
   const [search, setSearch] = useState<string>("");
   const [deptFilter, setDeptFilter] = useState<string>("all");
 
-  // Invite Modal state
-  const [isInviteOpen, setIsInviteOpen] = useState<boolean>(false);
-  const [inviteEmail, setInviteEmail] = useState<string>("");
-  const [inviteFirstName, setInviteFirstName] = useState<string>("");
-  const [inviteLastName, setInviteLastName] = useState<string>("");
-  const [inviteRole, setInviteRole] = useState<Role>("EMPLOYEE");
-  const [inviteDept, setInviteDept] = useState<string>("dept-sw");
-  const [inviteJobTitle, setInviteJobTitle] = useState<string>("");
-  const [inviteLoading, setInviteLoading] = useState<boolean>(false);
-  const [inviteError, setInviteError] = useState<string>("");
+  // Super-admin direct user creation state
+  const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
+  const [createEmail, setCreateEmail] = useState<string>("");
+  const [createFirstName, setCreateFirstName] = useState<string>("");
+  const [createLastName, setCreateLastName] = useState<string>("");
+  const [createPassword, setCreatePassword] = useState<string>("");
+  const [createRole, setCreateRole] = useState<Role>("EMPLOYEE");
+  const [createDept, setCreateDept] = useState<string>("dept-sw");
+  const [createJobTitle, setCreateJobTitle] = useState<string>("");
+  const [createLoading, setCreateLoading] = useState<boolean>(false);
+  const [createError, setCreateError] = useState<string>("");
 
   // Edit User Modal state
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editFirstName, setEditFirstName] = useState<string>("");
   const [editLastName, setEditLastName] = useState<string>("");
+  const [editEmail, setEditEmail] = useState<string>("");
   const [editJobTitle, setEditJobTitle] = useState<string>("");
   const [editDeptId, setEditDeptId] = useState<string>("");
+  const [editRole, setEditRole] = useState<Role>("EMPLOYEE");
   const [editLoading, setEditLoading] = useState<boolean>(false);
+  const [canManageSuperAdminTools, setCanManageSuperAdminTools] = useState(false);
+  const [passwordTarget, setPasswordTarget] = useState<User | null>(null);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminPasswordError, setAdminPasswordError] = useState("");
+  const [adminPasswordLoading, setAdminPasswordLoading] = useState(false);
 
   // Audit Logs Modal state
   const [isAuditOpen, setIsAuditOpen] = useState<boolean>(false);
@@ -97,6 +106,12 @@ export const UserManagementPage: React.FC = () => {
 
   useEffect(() => {
     fetchUsers();
+    if (token) {
+      fetch(`${API_BASE_URL}/auth/two-factor`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((response) => response.json())
+        .then((result) => setCanManageSuperAdminTools(Boolean(result?.data?.canManageEnforcement)))
+        .catch(() => setCanManageSuperAdminTools(false));
+    }
   }, [token]);
 
   const handleToggleStatus = async (targetUser: User) => {
@@ -130,43 +145,45 @@ export const UserManagementPage: React.FC = () => {
     }
   };
 
-  const handleInviteSubmit = async (e: React.FormEvent) => {
+  const handleCreateUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setInviteError("");
-    setInviteLoading(true);
+    setCreateError("");
+    setCreateLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/users/invite`, {
+      const res = await fetch(`${API_BASE_URL}/users`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          email: inviteEmail.trim(),
-          firstName: inviteFirstName.trim(),
-          lastName: inviteLastName.trim(),
-          role: inviteRole,
-          departmentId: inviteDept,
-          jobTitle: inviteJobTitle.trim() || undefined,
+          email: createEmail.trim(),
+          firstName: createFirstName.trim(),
+          lastName: createLastName.trim(),
+          password: createPassword,
+          role: createRole,
+          departmentId: createDept,
+          jobTitle: createJobTitle.trim() || undefined,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data?.error?.message || "Failed to invite user");
+        throw new Error(data?.error?.message || "Failed to create user");
       }
 
-      setIsInviteOpen(false);
-      setInviteEmail("");
-      setInviteFirstName("");
-      setInviteLastName("");
-      setInviteJobTitle("");
+      setIsCreateOpen(false);
+      setCreateEmail("");
+      setCreateFirstName("");
+      setCreateLastName("");
+      setCreatePassword("");
+      setCreateJobTitle("");
       fetchUsers();
     } catch (err: any) {
-      setInviteError(err.message || "Invitation failed");
+      setCreateError(err.message || "User creation failed");
     } finally {
-      setInviteLoading(false);
+      setCreateLoading(false);
     }
   };
 
@@ -176,19 +193,21 @@ export const UserManagementPage: React.FC = () => {
     setEditLoading(true);
 
     try {
-      // 1. Update Profile
-      await fetch(`${API_BASE_URL}/users/${editingUser.id}/profile`, {
+      const identityResponse = await fetch(`${API_BASE_URL}/users/${editingUser.id}/${canManageSuperAdminTools ? "super-admin-details" : "profile"}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
+          ...(canManageSuperAdminTools ? { email: editEmail.trim() } : {}),
           firstName: editFirstName,
           lastName: editLastName,
           jobTitle: editJobTitle,
         }),
       });
+      const identityData = await identityResponse.json();
+      if (!identityResponse.ok) throw new Error(identityData?.error?.message || "Failed to update user details");
 
       // 2. Update Department if changed
       if (editDeptId && editDeptId !== editingUser.departmentId) {
@@ -202,10 +221,46 @@ export const UserManagementPage: React.FC = () => {
         });
       }
 
+      if (canManageSuperAdminTools && editRole !== editingUser.role) {
+        const roleResponse = await fetch(`${API_BASE_URL}/users/${editingUser.id}/role`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ role: editRole }),
+        });
+        const roleData = await roleResponse.json();
+        if (!roleResponse.ok) throw new Error(roleData?.error?.message || "Failed to update user role");
+      }
+
       setEditingUser(null);
       fetchUsers();
     } finally {
       setEditLoading(false);
+    }
+  };
+
+  const handleSetPassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!passwordTarget) return;
+    setAdminPasswordError("");
+    setAdminPasswordLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/users/${passwordTarget.id}/password`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ password: adminPassword }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error?.message || "Could not set password");
+      setPasswordTarget(null);
+      setAdminPassword("");
+      alert(result.message || "Password updated");
+    } catch (error: any) {
+      setAdminPasswordError(error.message || "Could not set password");
+    } finally {
+      setAdminPasswordLoading(false);
     }
   };
 
@@ -253,14 +308,16 @@ export const UserManagementPage: React.FC = () => {
             Audit Trail
           </Button>
 
-          <Button
-            variant="gradient"
-            size="sm"
-            onClick={() => setIsInviteOpen(true)}
-            leftIcon={<UserPlus className="h-4 w-4" />}
-          >
-            Invite New Member
-          </Button>
+          {canManageSuperAdminTools && (
+            <Button
+              variant="gradient"
+              size="sm"
+              onClick={() => setIsCreateOpen(true)}
+              leftIcon={<UserPlus className="h-4 w-4" />}
+            >
+              Create User
+            </Button>
+          )}
         </div>
       </div>
 
@@ -444,14 +501,26 @@ export const UserManagementPage: React.FC = () => {
                                 setEditingUser(u);
                                 setEditFirstName(u.profile?.firstName || "");
                                 setEditLastName(u.profile?.lastName || "");
+                                setEditEmail(u.email);
                                 setEditJobTitle(u.profile?.jobTitle || "");
                                 setEditDeptId(u.departmentId || "dept-sw");
+                                setEditRole(u.role);
                               }}
                               className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                               title="Edit Profile & Department"
                             >
                               <Edit2 className="h-4 w-4" />
                             </button>
+
+                            {canManageSuperAdminTools && (
+                              <button
+                                onClick={() => { setPasswordTarget(u); setAdminPassword(""); setAdminPasswordError(""); }}
+                                className="rounded-lg p-1.5 text-amber-600 hover:bg-amber-50"
+                                title="Set user password"
+                              >
+                                <KeyRound className="h-4 w-4" />
+                              </button>
+                            )}
 
                             {u.id !== currentUser?.id && (
                               <button
@@ -478,17 +547,17 @@ export const UserManagementPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Invite User Modal */}
+      {/* Create User Modal */}
       <Modal
-        isOpen={isInviteOpen}
-        onClose={() => setIsInviteOpen(false)}
-        title="Invite New Livexpert Member"
-        description="Creates user account, sets temporary credentials, and dispatches activation email."
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        title="Create User Account"
+        description="Create an active account and set its initial password. The user can sign in immediately."
       >
-        <form onSubmit={handleInviteSubmit} className="space-y-4">
-          {inviteError && (
+        <form onSubmit={handleCreateUserSubmit} className="space-y-4">
+          {createError && (
             <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
-              {inviteError}
+              {createError}
             </div>
           )}
 
@@ -497,15 +566,15 @@ export const UserManagementPage: React.FC = () => {
               label="First Name"
               required
               placeholder="e.g. Rahul"
-              value={inviteFirstName}
-              onChange={(e) => setInviteFirstName(e.target.value)}
+              value={createFirstName}
+              onChange={(e) => setCreateFirstName(e.target.value)}
             />
             <Input
               label="Last Name"
               required
               placeholder="e.g. Verma"
-              value={inviteLastName}
-              onChange={(e) => setInviteLastName(e.target.value)}
+              value={createLastName}
+              onChange={(e) => setCreateLastName(e.target.value)}
             />
           </div>
 
@@ -514,15 +583,25 @@ export const UserManagementPage: React.FC = () => {
             type="email"
             required
             placeholder="name@livexpert.in"
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
+            value={createEmail}
+            onChange={(e) => setCreateEmail(e.target.value)}
+          />
+
+          <Input
+            label="Initial Password"
+            type="password"
+            required
+            minLength={8}
+            autoComplete="new-password"
+            value={createPassword}
+            onChange={(e) => setCreatePassword(e.target.value)}
           />
 
           <Input
             label="Job Title"
             placeholder="e.g. Platform Engineer"
-            value={inviteJobTitle}
-            onChange={(e) => setInviteJobTitle(e.target.value)}
+            value={createJobTitle}
+            onChange={(e) => setCreateJobTitle(e.target.value)}
           />
 
           <div className="space-y-1.5">
@@ -530,8 +609,8 @@ export const UserManagementPage: React.FC = () => {
               Department Assignment <span className="text-[#E81778]">*</span>
             </label>
             <select
-              value={inviteDept}
-              onChange={(e) => setInviteDept(e.target.value)}
+              value={createDept}
+              onChange={(e) => setCreateDept(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-800 focus:border-[#690BA8] focus:outline-none"
             >
               <option value="dept-sw">Software / IT</option>
@@ -544,8 +623,8 @@ export const UserManagementPage: React.FC = () => {
               Access Role <span className="text-[#E81778]">*</span>
             </label>
             <select
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as Role)}
+              value={createRole}
+              onChange={(e) => setCreateRole(e.target.value as Role)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-800 focus:border-[#690BA8] focus:outline-none"
             >
               <option value="EMPLOYEE">Employee</option>
@@ -560,7 +639,7 @@ export const UserManagementPage: React.FC = () => {
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => setIsInviteOpen(false)}
+              onClick={() => setIsCreateOpen(false)}
             >
               Cancel
             </Button>
@@ -568,9 +647,9 @@ export const UserManagementPage: React.FC = () => {
               type="submit"
               variant="gradient"
               size="sm"
-              isLoading={inviteLoading}
+              isLoading={createLoading}
             >
-              Send Invitation
+              Create User
             </Button>
           </div>
         </form>
@@ -580,7 +659,7 @@ export const UserManagementPage: React.FC = () => {
       <Modal
         isOpen={!!editingUser}
         onClose={() => setEditingUser(null)}
-        title="Edit User Profile & Department"
+        title={canManageSuperAdminTools ? "Edit User Details" : "Edit User Profile & Department"}
         description={`Modifying access parameters for ${editingUser?.email}`}
       >
         <form onSubmit={handleEditSubmit} className="space-y-4">
@@ -596,6 +675,24 @@ export const UserManagementPage: React.FC = () => {
               onChange={(e) => setEditLastName(e.target.value)}
             />
           </div>
+
+          {canManageSuperAdminTools && <Input label="Email address" type="email" required value={editEmail} onChange={(event) => setEditEmail(event.target.value)} />}
+
+          {canManageSuperAdminTools && (
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">Role</label>
+              <select
+                value={editRole}
+                onChange={(event) => setEditRole(event.target.value as Role)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-800 focus:border-[#690BA8] focus:outline-none"
+              >
+                <option value="ADMINISTRATOR">Administrator</option>
+                <option value="PROJECT_MANAGER">Project Manager</option>
+                <option value="TEAM_LEAD">Team Lead</option>
+                <option value="EMPLOYEE">Employee</option>
+              </select>
+            </div>
+          )}
 
           <Input
             label="Job Title"
@@ -638,12 +735,28 @@ export const UserManagementPage: React.FC = () => {
         </form>
       </Modal>
 
+      <Modal
+        isOpen={Boolean(passwordTarget)}
+        onClose={() => setPasswordTarget(null)}
+        title="Set User Password"
+        description={`Set a new sign-in password for ${passwordTarget?.email || "this user"}. Their active sessions will be revoked.`}
+      >
+        <form onSubmit={handleSetPassword} className="space-y-4">
+          {adminPasswordError && <p className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{adminPasswordError}</p>}
+          <Input label="New password" type="password" minLength={8} required value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} autoComplete="new-password" />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setPasswordTarget(null)}>Cancel</Button>
+            <Button type="submit" variant="primary" size="sm" isLoading={adminPasswordLoading} disabled={adminPassword.length < 8}>Set Password</Button>
+          </div>
+        </form>
+      </Modal>
+
       {/* Audit Logs Modal */}
       <Modal
         isOpen={isAuditOpen}
         onClose={() => setIsAuditOpen(false)}
         title="Security & Permission Audit Trail"
-        description="Chronological log of administrative actions, logins, status changes, and invitations."
+        description="Chronological log of administrative actions, logins, status changes, and user creation."
       >
         <div className="max-h-[60vh] overflow-y-auto space-y-2">
           {auditLoading ? (

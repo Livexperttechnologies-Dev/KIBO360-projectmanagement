@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -11,10 +11,14 @@ import {
   Settings,
   ShieldCheck,
   X,
-  LogOut,
+  UserCircle,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
-import { Badge } from "../ui/Badge";
 import { useAuth } from "../../contexts/AuthContext";
+import { fetchProjects } from "../../api/project";
+import { fetchTasks } from "../../api/task";
+import { notificationApi } from "../../api/notification";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -22,17 +26,48 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const { user, logout } = useAuth();
+  const { user, token } = useAuth();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [menuCounts, setMenuCounts] = useState<{ projects: number | null; tasks: number | null; notifications: number | null }>({ projects: null, tasks: null, notifications: null });
 
-  const baseNavItems = [
-    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-    { name: "Projects", path: "/projects", icon: FolderKanban, badge: "8" },
-    { name: "My Tasks", path: "/my-tasks", icon: CheckSquare, badge: "12" },
+  useEffect(() => {
+    if (!user || !token) {
+      setMenuCounts({ projects: null, tasks: null, notifications: null });
+      return;
+    }
+
+    let isCurrent = true;
+    const loadCounts = async () => {
+      const [projects, tasks, notifications] = await Promise.allSettled([
+        fetchProjects({}, token),
+        fetchTasks({ assigneeId: user.id, limit: 1 }, token),
+        notificationApi.getUnreadCount(token),
+      ]);
+      if (!isCurrent) return;
+      setMenuCounts({
+        projects: projects.status === "fulfilled" ? projects.value.length : null,
+        tasks: tasks.status === "fulfilled" ? tasks.value.pagination.total : null,
+        notifications: notifications.status === "fulfilled" ? notifications.value : null,
+      });
+    };
+
+    void loadCounts();
+    const interval = window.setInterval(() => void loadCounts(), 30000);
+    return () => {
+      isCurrent = false;
+      window.clearInterval(interval);
+    };
+  }, [token, user?.id]);
+
+  const workspaceItems = [
+    { name: "Projects", path: "/projects", icon: FolderKanban, badge: menuCounts.projects != null && String(menuCounts.projects) },
+    { name: "My Tasks", path: "/my-tasks", icon: CheckSquare, badge: menuCounts.tasks != null && String(menuCounts.tasks) },
     { name: "Team Tasks", path: "/team-tasks", icon: Users2 },
     { name: "Calendar", path: "/calendar", icon: Calendar },
+  ];
+  const insightItems = [
     { name: "Reports", path: "/reports", icon: BarChart3 },
-    { name: "Notifications", path: "/notifications", icon: Bell, badge: "3", badgeVariant: "magenta" as const },
-    { name: "Settings", path: "/settings", icon: Settings },
+    { name: "Notifications", path: "/notifications", icon: Bell, badge: menuCounts.notifications != null && menuCounts.notifications > 0 ? String(menuCounts.notifications) : undefined },
   ];
 
   // Admin-only nav item
@@ -40,7 +75,46 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     ? [{ name: "Users & Access", path: "/users", icon: ShieldCheck, badge: "Admin", badgeVariant: "primary" as const }]
     : [];
 
-  const navItems = [...baseNavItems, ...adminNavItems];
+  const systemItems = [
+    { name: "Settings", path: "/settings", icon: Settings },
+    ...adminNavItems,
+  ];
+  const accountItems = [{ name: "My Profile", path: "/profile", icon: UserCircle }];
+
+  const renderNavItem = (item: { name: string; path: string; icon: React.ElementType; badge?: string | false }) => {
+    const Icon = item.icon;
+    return (
+      <NavLink
+        key={item.path}
+        to={item.path}
+        title={isCollapsed ? item.name : undefined}
+        onClick={() => {
+          if (window.innerWidth < 1024) onClose();
+        }}
+        className={({ isActive }) =>
+          `group flex min-h-10 items-center rounded-xl py-2 text-[13px] font-semibold transition-all duration-150 ${isCollapsed ? "justify-center px-0" : "justify-between px-3.5"} ${
+            isActive
+              ? "bg-[#bb3b78] text-white shadow-[0_5px_18px_rgba(187,59,120,0.2)]"
+              : "text-[#e7dce9] hover:bg-white/[0.07] hover:text-white"
+          }`
+        }
+      >
+        {({ isActive }) => (
+          <>
+            <span className={`flex min-w-0 items-center ${isCollapsed ? "justify-center" : "gap-3"}`}>
+              <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-white" : "text-[#b79abd] group-hover:text-[#f3c9de]"}`} />
+              {!isCollapsed && <span className="truncate">{item.name}</span>}
+            </span>
+            {!isCollapsed && item.badge && (
+              <span className={`ml-2 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${isActive ? "bg-white/20 text-white" : "bg-white/10 text-[#e4b8d0]"}`}>
+                {item.badge}
+              </span>
+            )}
+          </>
+        )}
+      </NavLink>
+    );
+  };
 
   return (
     <>
@@ -54,111 +128,73 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-slate-200/90 bg-white transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex ${isCollapsed ? "w-20" : "w-72"} flex-col border-r border-white/10 border-t-[3px] border-t-[#f4b83f] bg-[#1b0d22] text-white transition-[width,transform] duration-300 ease-in-out lg:static lg:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Brand Header */}
-        <div className="flex h-20 items-center justify-between border-b border-slate-100 px-6">
-          <div className="flex items-center gap-3">
+        <div className="relative flex h-[104px] shrink-0 items-center justify-center border-b border-white/10 px-5">
+          <div className="flex flex-col items-center gap-1">
             <img
-              src="/kibo360-logo.png"
+              src="/kibo360-logo-white.png"
               alt="KIBO360 Logo"
-              className="h-10 w-auto object-contain"
+              className={`${isCollapsed ? "h-9" : "h-[58px]"} w-auto object-contain`}
             />
-            <div className="flex flex-col">
-              <span className="text-xs font-bold tracking-wider text-[#690BA8] uppercase">
-                Project Hub
-              </span>
-              <span className="text-[10px] text-slate-400 font-medium">
-                Livexpert Technologies
-              </span>
-            </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 lg:hidden"
+            className="absolute right-3 top-3 rounded-lg p-1.5 text-[#b79abd] hover:bg-white/10 hover:text-white lg:hidden"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Navigation Items */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-1">
-          <div className="px-3 pb-2 text-[11px] font-bold tracking-wider uppercase text-slate-400">
-            Main Navigation
+        <div className={`flex-1 space-y-5 overflow-y-auto py-4 ${isCollapsed ? "px-2" : "px-3.5"}`}>
+          <div className="space-y-2 border-b border-white/10 pb-3">
+            {renderNavItem({ name: "Dashboard", path: "/dashboard", icon: LayoutDashboard })}
           </div>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                onClick={() => {
-                  if (window.innerWidth < 1024) onClose();
-                }}
-                className={({ isActive }) =>
-                  `group flex items-center justify-between rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all duration-150 ${
-                    isActive
-                      ? "bg-[#F5EFFB] text-[#690BA8] shadow-sm font-bold"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <div className="flex items-center gap-3">
-                      <Icon
-                        className={`h-5 w-5 transition-colors ${
-                          isActive
-                            ? "text-[#690BA8]"
-                            : "text-slate-400 group-hover:text-slate-600"
-                        }`}
-                      />
-                      <span>{item.name}</span>
-                    </div>
-                    {item.badge && (
-                      <Badge
-                        variant={item.badgeVariant || (isActive ? "primary" : "neutral")}
-                        size="sm"
-                      >
-                        {item.badge}
-                      </Badge>
-                    )}
-                  </>
-                )}
-              </NavLink>
-            );
-          })}
+
+          <section className="space-y-1.5">
+            {!isCollapsed && <h2 className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9f7ba8]">Workspace</h2>}
+            {workspaceItems.map(renderNavItem)}
+          </section>
+
+          <section className="space-y-1.5 border-t border-white/10 pt-4">
+            {!isCollapsed && <h2 className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9f7ba8]">Performance &amp; Reports</h2>}
+            {insightItems.map(renderNavItem)}
+          </section>
+
+          <section className="space-y-1.5 border-t border-white/10 pt-4">
+            {!isCollapsed && <h2 className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9f7ba8]">System</h2>}
+            {systemItems.map(renderNavItem)}
+          </section>
+
+          <section className="space-y-1.5 border-t border-white/10 pt-4">
+            {!isCollapsed && <h2 className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9f7ba8]">Account</h2>}
+            {accountItems.map(renderNavItem)}
+          </section>
         </div>
 
-        {/* User Card in Sidebar Footer */}
-        {user && (
-          <div className="border-t border-slate-100 p-4">
-            <div className="flex items-center justify-between rounded-xl bg-[#F8F9FC] p-3 border border-slate-200/60">
-              <div className="flex items-center gap-2.5 truncate">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-[#690BA8] to-[#E81778] text-white text-xs font-bold shrink-0">
-                  {(user.profile?.firstName?.[0] || "") + (user.profile?.lastName?.[0] || user.email[0].toUpperCase())}
-                </div>
-                <div className="truncate">
-                  <div className="text-xs font-bold text-slate-800 truncate">
-                    {user.profile?.firstName} {user.profile?.lastName}
-                  </div>
-                  <div className="text-[10px] text-slate-400 truncate">
-                    {user.role.replace("_", " ")}
-                  </div>
-                </div>
+        <div className="shrink-0 border-t border-white/10 p-3">
+          <button
+            type="button"
+            onClick={() => setIsCollapsed((current) => !current)}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className={`flex min-h-9 w-full items-center rounded-lg border border-white/15 text-xs font-semibold text-[#e7dce9] transition-colors hover:bg-white/[0.07] hover:text-white ${isCollapsed ? "justify-center px-0" : "justify-center gap-2 px-2"}`}
+          >
+            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <><ChevronLeft className="h-4 w-4" /><span>Collapse</span></>}
+          </button>
+          {user && !isCollapsed && (
+            <div className="mt-2 rounded-lg border border-white/10 px-2.5 py-2 text-center">
+              <div className="text-[10px] font-semibold text-white">Powered by Livexpert Technologies</div>
+              <div className="mt-0.5 text-[10px] text-[#9f7ba8]">
+                {user.role === "ADMINISTRATOR" ? "Administrator" : user.role.replace(/_/g, " ")}
               </div>
-              <button
-                onClick={() => logout()}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition-colors"
-                title="Sign Out"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </aside>
     </>
   );

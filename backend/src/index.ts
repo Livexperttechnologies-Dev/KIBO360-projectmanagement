@@ -1,17 +1,41 @@
 import app from "./app";
 import { env } from "./config/env";
 import { schedulerService } from "./services/scheduler.service";
+import { closePersistence, initializePersistence, persistStore } from "./lib/persistence";
 
-const server = app.listen(env.PORT, () => {
-  console.log(`🚀 KIBO360 Hub API server listening on http://localhost:${env.PORT}`);
-  console.log(`📡 Health Check endpoint available at http://localhost:${env.PORT}/api/v1/health`);
-  console.log(`🏢 Organization: Livexpert Technologies Pvt. Ltd.`);
-  console.log(`⚙️  Environment: ${env.NODE_ENV}`);
+let server: ReturnType<typeof app.listen> | undefined;
 
-  // Start background scheduler
-  schedulerService.start();
-  console.log(`⏰ Background Scheduler & Job Queue Service active`);
-});
+async function startServer() {
+  await initializePersistence();
+  server = app.listen(env.PORT, () => {
+    console.log(`🚀 KIBO360 Hub API server listening on http://localhost:${env.PORT}`);
+    console.log(`📡 Health Check endpoint available at http://localhost:${env.PORT}/api/v1/health`);
+    console.log(`🏢 Organization: Livexpert Technologies Pvt. Ltd.`);
+    console.log(`⚙️  Environment: ${env.NODE_ENV}`);
+
+    schedulerService.start();
+    console.log(`⏰ Background Scheduler & Job Queue Service active`);
+  });
+}
+
+async function shutdown(exitCode = 0) {
+  schedulerService.stop();
+  if (!server) {
+    await closePersistence();
+    process.exit(exitCode);
+    return;
+  }
+
+  server.close(() => {
+    void persistStore()
+      .then(() => closePersistence())
+      .then(() => process.exit(exitCode))
+      .catch((error) => {
+        console.error("Error while saving data during shutdown:", error);
+        process.exit(1);
+      });
+  });
+}
 
 process.on("unhandledRejection", (err) => {
   console.error("Unhandled Rejection:", err);
@@ -19,7 +43,14 @@ process.on("unhandledRejection", (err) => {
 
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
-  process.exit(1);
+  void shutdown(1);
 });
 
-export default server;
+process.on("SIGINT", () => void shutdown(0));
+process.on("SIGTERM", () => void shutdown(0));
+
+startServer().catch((error) => {
+  console.error("Unable to start backend with PostgreSQL persistence:", error);
+  console.error("Check backend/.env and run npx prisma db push if the database schema is missing.");
+  process.exit(1);
+});

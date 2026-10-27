@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import { API_BASE_URL } from "../api/client";
 
 export type Role = "ADMINISTRATOR" | "PROJECT_MANAGER" | "TEAM_LEAD" | "EMPLOYEE";
@@ -36,6 +36,16 @@ export interface LoginCredentials {
   email: string;
   password: string;
   rememberMe?: boolean;
+  authenticatorCode?: string;
+}
+
+export interface TwoFactorLoginChallenge {
+  requiresTwoFactor: true;
+  requiresEnrollment?: boolean;
+  usesSuperAdminAuthenticator?: boolean;
+  setupSecret?: string;
+  setupUri?: string;
+  message?: string;
 }
 
 interface AuthContextType {
@@ -43,10 +53,9 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (credentials: LoginCredentials) => Promise<{ success: boolean; message?: string }>;
+  login: (credentials: LoginCredentials) => Promise<{ success: boolean; message?: string; challenge?: TwoFactorLoginChallenge }>;
   logout: () => Promise<void>;
-  requestPasswordReset: (email: string) => Promise<{ success: boolean; message: string; debugToken?: string }>;
-  resetPassword: (token: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
+  resetPassword: (email: string, authenticatorCode: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
   savedEmail: string;
   refreshUser: () => Promise<void>;
 }
@@ -56,11 +65,59 @@ export const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const TOKEN_KEY = "kibo360_access_token";
 const REMEMBER_ME_KEY = "kibo360_remembered_email";
 
+function tokenTimeRemaining(token: string): number {
+  try {
+    const encodedPayload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(window.atob(encodedPayload));
+    return typeof payload.exp === "number" ? payload.exp * 1000 - Date.now() : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [savedEmail, setSavedEmail] = useState<string>("");
+  const refreshRequest = useRef<Promise<boolean> | null>(null);
+
+  const refreshAccessToken = useCallback((): Promise<boolean> => {
+    if (refreshRequest.current) return refreshRequest.current;
+
+    const request = (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: "POST",
+          credentials: "include",
+        });
+        const json = await response.json().catch(() => null);
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            localStorage.removeItem(TOKEN_KEY);
+            setUser(null);
+            setToken(null);
+          }
+          return false;
+        }
+
+        const nextToken = json?.data?.accessToken;
+        const nextUser = json?.data?.user;
+        if (typeof nextToken !== "string" || !nextUser) return false;
+        localStorage.setItem(TOKEN_KEY, nextToken);
+        setToken(nextToken);
+        setUser(nextUser);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        refreshRequest.current = null;
+      }
+    })();
+
+    refreshRequest.current = request;
+    return request;
+  }, []);
 
   const refreshUser = async () => {
     const savedToken = localStorage.getItem(TOKEN_KEY);
@@ -76,6 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: {
           Authorization: `Bearer ${savedToken}`,
         },
+        credentials: "include",
       });
 
       if (response.ok) {
@@ -83,15 +141,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(json.data.user);
         setToken(savedToken);
       } else {
-        // Token expired or invalid
-        localStorage.removeItem(TOKEN_KEY);
-        setUser(null);
-        setToken(null);
+        await refreshAccessToken();
       }
     } catch {
-      localStorage.removeItem(TOKEN_KEY);
-      setUser(null);
-      setToken(null);
+      // Keep the saved session if the server is temporarily unreachable.
     } finally {
       setIsLoading(false);
     }
@@ -105,7 +158,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUser();
   }, []);
 
-  const login = async (credentials: LoginCredentials): Promise<{ success: boolean; message?: string }> => {
+  useEffect(() => {
+    if (!token) return;
+
+    let retryTimer: number | undefined;
+    const attemptRefresh = async () => {
+      const refreshed = await refreshAccessToken();
+      if (!refreshed && localStorage.getItem(TOKEN_KEY)) {
+        retryTimer = window.setTimeout(() => void attemptRefresh(), 60 * 1000);
+      }
+    };
+    const refreshTimer = window.setTimeout(() => void attemptRefresh(), 12 * 60 * 1000);
+    const refreshOnReturn = () => {
+      const currentToken = localStorage.getItem(TOKEN_KEY);
+      if (currentToken && tokenTimeRemaining(currentToken) < 2 * 60 * 1000) {
+        void attemptRefresh();
+      }
+    };
+    window.addEventListener("focus", refreshOnReturn);
+    document.addEventListener("visibilitychange", refreshOnReturn);
+
+    return () => {
+      window.clearTimeout(refreshTimer);
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+      window.removeEventListener("focus", refreshOnReturn);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+    };
+  }, [token, refreshAccessToken]);
+
+  const login = async (credentials: LoginCredentials): Promise<{ success: boolean; message?: string; challenge?: TwoFactorLoginChallenge }> => {
     setIsLoading(true);
 
     if (credentials.rememberMe) {
@@ -132,6 +213,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           success: false,
           message: data?.error?.message || "Invalid email or password",
         };
+      }
+
+      if (data?.data?.requiresTwoFactor) {
+        setIsLoading(false);
+        return { success: false, challenge: data.data };
       }
 
       const receivedToken = data.data.accessToken;
@@ -169,30 +255,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const requestPasswordReset = async (email: string) => {
-    const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data?.error?.message || "Failed to process password reset request");
-    }
-
-    return {
-      success: true,
-      message: data.message,
-      debugToken: data.debugToken,
-    };
-  };
-
-  const resetPassword = async (tokenString: string, newPassword: string) => {
+  const resetPassword = async (email: string, authenticatorCode: string, newPassword: string) => {
     const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: tokenString, newPassword }),
+      body: JSON.stringify({ email, authenticatorCode, newPassword }),
     });
 
     const data = await response.json();
@@ -215,7 +282,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login,
         logout,
-        requestPasswordReset,
         resetPassword,
         savedEmail,
         refreshUser,

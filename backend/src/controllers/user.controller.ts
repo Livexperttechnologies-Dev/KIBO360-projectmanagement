@@ -11,7 +11,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
       search?: string;
     };
 
-    const users = UserService.listUsers({ departmentId, role, search });
+    const users = UserService.listUsers({ departmentId, role, search }, req.user);
 
     res.status(200).json({
       success: true,
@@ -39,16 +39,17 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
   }
 }
 
-export async function inviteUser(req: Request, res: Response, next: NextFunction) {
+export async function createUser(req: Request, res: Response, next: NextFunction) {
   try {
-    const { email, firstName, lastName, role, departmentId, jobTitle } = req.body;
-    const actorUserId = req.user?.userId;
+    const { email, firstName, lastName, password, role, departmentId, jobTitle } = req.body;
+    const actorUserId = req.user!.userId;
     const ipAddress = (req.ip || req.socket.remoteAddress) as string | undefined;
 
-    const result = await UserService.inviteUser({
+    const result = await UserService.createUser({
       email,
       firstName,
       lastName,
+      password,
       role,
       departmentId,
       jobTitle,
@@ -58,7 +59,7 @@ export async function inviteUser(req: Request, res: Response, next: NextFunction
 
     res.status(201).json({
       success: true,
-      message: "User invitation created and notification dispatched.",
+      message: "User account created successfully.",
       data: result,
     });
   } catch (error) {
@@ -103,6 +104,37 @@ export async function updateUserProfile(req: Request, res: Response, next: NextF
       message: "Profile updated successfully.",
       data: { user: updatedUser },
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function superAdminUpdateUser(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const user = await UserService.superAdminUpdateUser({
+      userId: id,
+      actorUserId: req.user!.userId,
+      ...req.body,
+      ipAddress: req.ip || req.socket.remoteAddress,
+    });
+    res.status(200).json({ success: true, message: "User details updated.", data: { user } });
+  } catch (error) { next(error); }
+}
+
+export async function superAdminSetPassword(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    await UserService.superAdminSetPassword(req.user!.userId, id, req.body.password, req.ip || req.socket.remoteAddress);
+    res.status(200).json({ success: true, message: "Password set. The user must sign in with the new password." });
+  } catch (error) { next(error); }
+}
+
+export async function updateUserRole(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const user = await UserService.updateUserRole(id, req.body.role, req.user!.userId, req.ip || req.socket.remoteAddress);
+    res.status(200).json({ success: true, message: "User role updated.", data: { user } });
   } catch (error) {
     next(error);
   }

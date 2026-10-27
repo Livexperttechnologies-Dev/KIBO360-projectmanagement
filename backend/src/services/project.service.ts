@@ -89,7 +89,9 @@ export class ProjectService {
 
     // Status filter
     if (filters.status && filters.status !== "all") {
-      projects = projects.filter((p) => p.status === filters.status);
+      projects = filters.status === "ACTIVE"
+        ? projects.filter((p) => p.status === "ACTIVE" || p.status === "IN_PROGRESS")
+        : projects.filter((p) => p.status === filters.status);
     }
 
     // Priority filter

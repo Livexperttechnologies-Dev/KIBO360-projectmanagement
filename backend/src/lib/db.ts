@@ -62,7 +62,25 @@ export interface RefreshTokenRecord {
   revokedAt?: Date;
   ipAddress?: string;
   userAgent?: string;
+  twoFactorVerified?: boolean;
   createdAt: Date;
+}
+
+export interface UserTwoFactorRecord {
+  id: string;
+  userId: string;
+  encryptedSecret: string;
+  enabled: boolean;
+  lastVerifiedStep?: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface SecuritySettingRecord {
+  id: string;
+  globalTwoFactorEnabled: boolean;
+  updatedBy?: string;
+  updatedAt: Date;
 }
 
 export interface PasswordResetTokenRecord {
@@ -233,6 +251,10 @@ class HubDatabaseStore {
   public users: UserRecord[] = [];
   public profiles: ProfileRecord[] = [];
   public refreshTokens: RefreshTokenRecord[] = [];
+  public userTwoFactors: UserTwoFactorRecord[] = [];
+  public securitySettings: SecuritySettingRecord[] = [
+    { id: "global", globalTwoFactorEnabled: false, updatedAt: new Date() },
+  ];
   public passwordResetTokens: PasswordResetTokenRecord[] = [];
   public auditLogs: AuditLogRecord[] = [];
   public projects: ProjectRecord[] = [];

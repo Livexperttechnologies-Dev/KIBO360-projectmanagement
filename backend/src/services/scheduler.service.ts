@@ -1,6 +1,7 @@
 import { dbStore } from "../lib/db";
 import { notificationService } from "./notification.service";
 import { jobQueueService } from "./job-queue.service";
+import { persistStore } from "../lib/persistence";
 
 export class SchedulerService {
   private timer: NodeJS.Timeout | null = null;
@@ -136,6 +137,8 @@ export class SchedulerService {
     // Also run an initial check
     this.runCycle().catch((err) => {
       console.error("[SchedulerService] Error on initial cycle:", err);
+    }).then(() => persistStore()).catch((err) => {
+      console.error("[SchedulerService] Error saving initial cycle:", err);
     });
   }
 

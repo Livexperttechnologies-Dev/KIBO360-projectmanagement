@@ -16,6 +16,7 @@ RUN npm ci
 
 # Copy source code and TypeScript config
 COPY tsconfig.json ./
+COPY tsconfig.server.json ./
 COPY src ./src/
 
 # Generate Prisma client and compile TypeScript
@@ -46,7 +47,7 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/dist ./dist
 
 # Create logs directory and assign permissions to node user
-RUN mkdir -p /app/logs && chown -R node:node /app
+RUN mkdir -p /app/logs /app/uploads && chown -R node:node /app
 
 USER node
 

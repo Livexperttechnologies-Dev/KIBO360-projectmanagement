@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Kanban,
   List,
@@ -38,6 +39,7 @@ const KANBAN_COLUMNS = [
 
 export const TeamTasksPage: React.FC = () => {
   const { token, user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,6 +79,13 @@ export const TeamTasksPage: React.FC = () => {
     selectedStatus,
     page,
   ]);
+
+  useEffect(() => {
+    const taskId = searchParams.get("taskId");
+    if (!taskId) return;
+    setSelectedTaskId(taskId);
+    setIsDetailModalOpen(true);
+  }, [searchParams]);
 
   const loadFiltersData = async () => {
     try {
@@ -605,6 +614,11 @@ export const TeamTasksPage: React.FC = () => {
         onClose={() => {
           setIsDetailModalOpen(false);
           setSelectedTaskId(null);
+          if (searchParams.has("taskId")) {
+            const nextParams = new URLSearchParams(searchParams);
+            nextParams.delete("taskId");
+            setSearchParams(nextParams, { replace: true });
+          }
         }}
         onTaskUpdated={() => loadTasks()}
       />

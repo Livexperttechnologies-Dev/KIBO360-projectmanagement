@@ -15,11 +15,11 @@ services:
     environment:
       POSTGRES_DB: kibo360_staging
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:-StagingPostgres2026Secure!}
+      POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD:?Staging PostgreSQL password must be set}
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - kibo360_staging_pgdata:/var/lib/postgresql/data
-      - ./deployment/scripts/init-prod-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./deployment/scripts/init-staging-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     networks:
       - kibo360-staging-net
     ports:
@@ -31,6 +31,48 @@ services:
       retries: 5
       start_period: 10s
 
+  backend-staging-migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: kibo360-staging-migrate
+    restart: "no"
+    depends_on:
+      postgres-staging:
+        condition: service_healthy
+    env_file:
+      - .env.staging
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:${STAGING_POSTGRES_PASSWORD:?Staging PostgreSQL password must be set}@postgres-staging:5432/kibo360_staging?schema=public
+    command: ["npx", "prisma", "migrate", "deploy"]
+    networks:
+      - kibo360-staging-net
+
+  # Create the initial staging super-admin once, after the schema is ready.
+  backend-staging-bootstrap:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: kibo360-staging-bootstrap
+    restart: "no"
+    depends_on:
+      backend-staging-migrate:
+        condition: service_completed_successfully
+    env_file:
+      - .env.staging
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:${STAGING_POSTGRES_PASSWORD:?Staging PostgreSQL password must be set}@postgres-staging:5432/kibo360_staging?schema=public
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:?Set the staging super-admin email}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:?Set a strong staging admin password}
+      INITIAL_ADMIN_NAME: ${INITIAL_ADMIN_NAME:?Set the staging super-admin display name}
+    command: ["node", "dist/src/scripts/bootstrap-admin.js"]
+    networks:
+      - kibo360-staging-net
+
   # 2. Staging Node.js Backend API (Port 5001)
   backend-staging:
     build:
@@ -39,14 +81,16 @@ services:
     container_name: kibo360-staging-backend
     restart: always
     depends_on:
-      postgres-staging:
-        condition: service_healthy
+      backend-staging-migrate:
+        condition: service_completed_successfully
+      backend-staging-bootstrap:
+        condition: service_completed_successfully
     env_file:
       - .env.staging
     environment:
       NODE_ENV: production
       PORT: 5001
-      DATABASE_URL: postgresql://postgres:${STAGING_POSTGRES_PASSWORD:-StagingPostgres2026Secure!}@postgres-staging:5432/kibo360_staging?schema=public
+      DATABASE_URL: postgresql://postgres:${STAGING_POSTGRES_PASSWORD:?Staging PostgreSQL password must be set}@postgres-staging:5432/kibo360_staging?schema=public
       FRONTEND_URL: http://localhost:5174
       CORS_ORIGIN: http://localhost:5174
     networks:
@@ -55,6 +99,7 @@ services:
       - "127.0.0.1:5001:5001"
     volumes:
       - staging_logs:/app/logs
+      - staging_uploads:/app/uploads
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5001/api/v1/health/liveness || exit 1"]
       interval: 15s
@@ -88,3 +133,5 @@ volumes:
     name: kibo360_staging_pgdata
   staging_logs:
     name: kibo360_staging_logs
+  staging_uploads:
+    name: kibo360_staging_uploads

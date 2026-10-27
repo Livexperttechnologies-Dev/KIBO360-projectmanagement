@@ -106,14 +106,14 @@ Sample output:
 
 ```bash
 # 1. Stop backend application to prevent write conflicts
-docker compose -f docker-compose.prod.yml stop backend
+docker compose --env-file .env.production -f docker-compose.prod.yml stop backend
 
 # 2. Drop existing schema and restore from dump file
 psql -U postgres -d kibo360_hub -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 pg_restore -U kibo360_app -d kibo360_hub -v "/backups/kibo360_pg_20261026_020000.dump"
 
 # 3. Restart backend service
-docker compose -f docker-compose.prod.yml start backend
+docker compose --env-file .env.production -f docker-compose.prod.yml start backend
 ```
 
 ---

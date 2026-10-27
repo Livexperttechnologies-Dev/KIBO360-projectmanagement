@@ -4,20 +4,17 @@ import { z } from "zod";
 dotenv.config();
 
 const envSchema = z.object({
-  PORT: z.string().default("5000").transform((val) => parseInt(val, 10)),
+  PORT: z.string().default("5002").transform((val) => parseInt(val, 10)),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   CORS_ORIGIN: z.string().default("http://localhost:5173"),
   DATABASE_URL: z.string().default("postgresql://postgres:postgres@localhost:5432/kibo360_hub?schema=public"),
   JWT_ACCESS_SECRET: z.string().default("kibo360-livexpert-access-token-secret-2026"),
   JWT_REFRESH_SECRET: z.string().default("kibo360-livexpert-refresh-token-secret-2026"),
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
-  JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
-  SMTP_HOST: z.string().optional(),
-  SMTP_PORT: z.string().optional().transform((val) => (val ? parseInt(val, 10) : undefined)),
-  SMTP_USER: z.string().optional(),
-  SMTP_PASS: z.string().optional(),
-  SMTP_FROM: z.string().default("Livexpert Security <security@livexpert.in>"),
+  JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
   FRONTEND_URL: z.string().default("http://localhost:5173"),
+  SUPER_ADMIN_EMAIL: z.string().email().default("admin@livexpert.in"),
+  TOTP_ENCRYPTION_KEY: z.string().optional(),
   COMPANY_TIMEZONE: z.string().default("Asia/Kolkata"),
   RATE_LIMIT_WINDOW_MS: z.string().default("900000").transform((val) => parseInt(val, 10)), // 15 mins
   RATE_LIMIT_MAX_REQUESTS: z.string().default("1000").transform((val) => parseInt(val, 10)),
@@ -34,6 +31,11 @@ const envSchema = z.object({
 }, {
   message: "In production, secure JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be explicitly provided and cannot use default test secrets.",
   path: ["JWT_ACCESS_SECRET"],
+}).refine((data) => {
+  return data.NODE_ENV !== "production" || /^[0-9a-fA-F]{64}$/.test(data.TOTP_ENCRYPTION_KEY || "");
+}, {
+  message: "TOTP_ENCRYPTION_KEY must be a unique 64-character hexadecimal key in production.",
+  path: ["TOTP_ENCRYPTION_KEY"],
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

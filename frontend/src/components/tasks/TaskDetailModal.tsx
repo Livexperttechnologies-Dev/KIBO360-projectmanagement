@@ -11,6 +11,7 @@ import {
   addTaskComment,
   deleteTaskComment,
   addTaskAttachment,
+  downloadTaskAttachment,
   deleteTaskAttachment,
   addTaskDependency,
   removeTaskDependency,
@@ -67,8 +68,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [postingComment, setPostingComment] = useState(false);
 
   // Attachment form state
-  const [newFilename, setNewFilename] = useState("");
-  const [newFileUrl, setNewFileUrl] = useState("");
+  const [newFile, setNewFile] = useState<File | null>(null);
   const [newScope, setNewScope] = useState("PROJECT_MEMBERS");
   const [addingAttachment, setAddingAttachment] = useState(false);
 
@@ -198,29 +198,33 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   const handleAddAttachment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!task || !newFilename.trim()) return;
+    if (!task || !newFile) return;
     setAddingAttachment(true);
     setError(null);
     try {
-      await addTaskAttachment(
-        task.id,
-        {
-          filename: newFilename.trim(),
-          filesize: Math.floor(Math.random() * 500000) + 50000,
-          mimetype: newFilename.endsWith(".pdf") ? "application/pdf" : "image/png",
-          fileUrl: newFileUrl.trim() || `/uploads/${newFilename.trim()}`,
-          accessScope: newScope,
-        },
-        token
-      );
-      setNewFilename("");
-      setNewFileUrl("");
+      await addTaskAttachment(task.id, newFile, newScope, token);
+      setNewFile(null);
       await loadTaskData();
       if (onTaskUpdated) onTaskUpdated();
     } catch (err: any) {
       setError(err.message || "Failed to attach file");
     } finally {
       setAddingAttachment(false);
+    }
+  };
+
+  const handleDownloadAttachment = async (attachmentId: string, filename: string) => {
+    if (!task) return;
+    try {
+      const blob = await downloadTaskAttachment(task.id, attachmentId, token);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message || "Failed to download attachment");
     }
   };
 
@@ -866,15 +870,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         <Badge variant="neutral" size="sm">
                           {att.accessScope}
                         </Badge>
-                        <a
-                          href={att.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadAttachment(att.id, att.filename)}
                           className="p-1 text-slate-400 hover:text-[#690BA8]"
-                          title="Open Attachment"
+                          title="Download attachment"
                         >
                           <ExternalLink className="h-4 w-4" />
-                        </a>
+                        </button>
                         {(att.uploaderId === user?.id || user?.role === "ADMINISTRATOR") && (
                           <button
                             onClick={() => handleDeleteAttachment(att.id)}
@@ -895,10 +898,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 <span className="text-xs font-bold text-slate-700 block">+ Add Attachment</span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input
-                    type="text"
-                    value={newFilename}
-                    onChange={(e) => setNewFilename(e.target.value)}
-                    placeholder="Filename (e.g. spec_v1.pdf, diagram.png)"
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp,.txt"
+                    onChange={(e) => setNewFile(e.target.files?.[0] || null)}
                     required
                     className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs text-slate-800 bg-white focus:outline-none focus:border-[#690BA8]"
                   />

@@ -2,20 +2,26 @@ import { Router } from "express";
 import {
   listUsers,
   getUserById,
-  inviteUser,
+  createUser,
   updateUserStatus,
   updateUserProfile,
   assignDepartment,
   listDepartments,
   listAuditLogs,
+  superAdminUpdateUser,
+  superAdminSetPassword,
+  updateUserRole,
 } from "../controllers/user.controller";
-import { authenticate, requireRole } from "../middleware/auth";
+import { authenticate, requireRole, requireSuperAdmin } from "../middleware/auth";
 import { validateRequest } from "../middleware/validateRequest";
 import {
-  inviteUserSchema,
+  createUserSchema,
   updateUserStatusSchema,
   updateUserProfileSchema,
   assignDepartmentSchema,
+  superAdminUserUpdateSchema,
+  superAdminSetPasswordSchema,
+  updateUserRoleSchema,
 } from "../validations/auth.validation";
 
 const router = Router();
@@ -27,15 +33,30 @@ router.get("/departments", authenticate, listDepartments);
 router.get("/audit-logs", authenticate, requireRole("ADMINISTRATOR"), listAuditLogs);
 
 // User directory (Administrator and Project Manager)
-router.get("/", authenticate, requireRole("ADMINISTRATOR", "PROJECT_MANAGER"), listUsers);
+router.get("/", authenticate, requireRole("ADMINISTRATOR", "PROJECT_MANAGER", "TEAM_LEAD", "EMPLOYEE"), listUsers);
 
 // Specific user
 router.get("/:id", authenticate, getUserById);
 
 // Admin-only management routes
-router.post("/invite", authenticate, requireRole("ADMINISTRATOR"), validateRequest(inviteUserSchema), inviteUser);
+router.post("/", authenticate, requireSuperAdmin, validateRequest(createUserSchema), createUser);
 router.patch("/:id/status", authenticate, requireRole("ADMINISTRATOR"), validateRequest(updateUserStatusSchema), updateUserStatus);
-router.patch("/:id/profile", authenticate, validateRequest(updateUserProfileSchema), updateUserProfile);
+router.patch("/:id/super-admin-details", authenticate, requireSuperAdmin, validateRequest(superAdminUserUpdateSchema), superAdminUpdateUser);
+router.put("/:id/password", authenticate, requireSuperAdmin, validateRequest(superAdminSetPasswordSchema), superAdminSetPassword);
+router.patch("/:id/role", authenticate, requireSuperAdmin, validateRequest(updateUserRoleSchema), updateUserRole);
+router.patch(
+  "/:id/profile",
+  authenticate,
+  (req, res, next) => {
+    if (req.params.id !== req.user?.userId && req.user?.role !== "ADMINISTRATOR") {
+      res.status(403).json({ success: false, error: { message: "You can only edit your own profile" } });
+      return;
+    }
+    next();
+  },
+  validateRequest(updateUserProfileSchema),
+  updateUserProfile
+);
 router.patch("/:id/department", authenticate, requireRole("ADMINISTRATOR"), validateRequest(assignDepartmentSchema), assignDepartment);
 
 export default router;

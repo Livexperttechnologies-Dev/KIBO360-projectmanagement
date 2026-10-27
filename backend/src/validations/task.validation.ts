@@ -78,6 +78,12 @@ export const updateTaskSchema = z.object({
     ),
 });
 
+export const updateTaskStatusSchema = z.object({
+  body: z.object({
+    status: z.enum(taskStatuses),
+  }),
+});
+
 export const createSubtaskSchema = z.object({
   body: z
     .object({
@@ -113,10 +119,6 @@ export const addCommentSchema = z.object({
 
 export const addAttachmentSchema = z.object({
   body: z.object({
-    filename: z.string().min(1, "Filename is required").max(255),
-    filesize: z.number().min(1, "Filesize must be greater than 0"),
-    mimetype: z.string().min(1, "MIME type is required"),
-    fileUrl: z.string().min(1, "File URL is required"),
     accessScope: z.enum(["PUBLIC", "PROJECT_MEMBERS", "ASSIGNEE_ONLY"]).default("PROJECT_MEMBERS"),
   }),
 });

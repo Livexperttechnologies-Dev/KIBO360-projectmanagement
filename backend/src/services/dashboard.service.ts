@@ -1,6 +1,6 @@
 import { dbStore, TaskRecord, ProjectRecord, TaskStatus, Role } from "../lib/db";
 import { TokenPayload } from "./auth.service";
-import { AuditService } from "./audit.service";
+import { TaskService } from "./task.service";
 
 export interface DashboardFilters {
   dateRange?: "all" | "today" | "this_week" | "this_month" | "this_quarter";
@@ -314,7 +314,9 @@ export class DashboardService {
    */
   public static getTasksAwaitingReview(filters: DashboardFilters, user: TokenPayload) {
     const tasks = this.filterTasks(filters, user).filter(
-      (t) => t.status === "IN_REVIEW" || t.status === "UNDER_REVIEW"
+      (t) =>
+        (t.status === "IN_REVIEW" || t.status === "UNDER_REVIEW") &&
+        (user.role === "ADMINISTRATOR" || user.role === "PROJECT_MANAGER" || t.reviewerId === user.userId)
     );
 
     return tasks.map((t) => {
@@ -485,25 +487,6 @@ export class DashboardService {
    * Quick status updater for interactive task management
    */
   public static async updateTaskStatus(taskId: string, newStatus: TaskStatus, user: TokenPayload) {
-    const task = dbStore.getTaskById(taskId);
-    if (!task) {
-      const error: any = new Error("Task not found");
-      error.status = 404;
-      throw error;
-    }
-
-    const previousStatus = task.status;
-    task.status = newStatus;
-    task.updatedAt = new Date();
-
-    await AuditService.log({
-      userId: user.userId,
-      targetId: task.id,
-      action: "TASK_STATUS_UPDATED",
-      entity: "Task",
-      details: { title: task.title, previousStatus, newStatus },
-    });
-
-    return task;
+    return TaskService.updateTask(taskId, { status: newStatus }, user);
   }
 }

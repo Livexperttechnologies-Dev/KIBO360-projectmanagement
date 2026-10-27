@@ -13,6 +13,8 @@ import {
   updateTaskStatus,
 } from "../controllers/dashboard.controller";
 import { authenticate } from "../middleware/auth";
+import { validateRequest } from "../middleware/validateRequest";
+import { updateTaskStatusSchema } from "../validations/task.validation";
 
 const router = Router();
 
@@ -26,6 +28,6 @@ router.get("/overdue", authenticate, getOverdueTasks);
 router.get("/status-stats", authenticate, getStatusStats);
 router.get("/workload", authenticate, getWorkload);
 router.get("/filters", authenticate, getFilterOptions);
-router.patch("/tasks/:id/status", authenticate, updateTaskStatus);
+router.patch("/tasks/:id/status", authenticate, validateRequest(updateTaskStatusSchema), updateTaskStatus);
 
 export default router;

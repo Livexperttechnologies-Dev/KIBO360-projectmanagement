@@ -61,7 +61,7 @@ KIBO360 Project Hub employs a three-tier decoupled architecture:
 | :--- | :--- | :--- | :--- |
 | **Hostname** | `localhost` | `staging.kibo360.livexpert.in` | `kibo360.livexpert.in` |
 | **Frontend URL** | `http://localhost:5173` | `http://localhost:5174` | `https://kibo360.livexpert.in` |
-| **Backend API URL** | `http://localhost:5000/api/v1` | `http://localhost:5001/api/v1` | `https://kibo360.livexpert.in/api/v1` |
+| **Backend API URL** | `http://localhost:5002/api/v1` | `http://localhost:5001/api/v1` | `https://kibo360.livexpert.in/api/v1` |
 | **PostgreSQL Port** | `5432` | `5433` | `5432` (internal Docker network) |
 | **Database Name** | `kibo360_hub` | `kibo360_staging` | `kibo360_hub` |
 | **Database User** | `postgres` | `postgres` | `kibo360_app` (least privilege) |
@@ -88,11 +88,6 @@ Every environment relies on a validated configuration file. Copy from `.env.prod
 | `COMPANY_TIMEZONE` | **Yes** | String | `Asia/Kolkata` | IANA timezone string for consistent deadline calculation. |
 | `RATE_LIMIT_WINDOW_MS`| No | Integer | `900000` | Rate limiter window in milliseconds (15 minutes). |
 | `RATE_LIMIT_MAX_REQUESTS`| No | Integer | `1000` | Maximum requests per client IP per window. |
-| `SMTP_HOST` | No | String | `smtp.livexpert.in` | Outbound mail server hostname. |
-| `SMTP_PORT` | No | Integer | `587` | Outbound mail submission port (587 STARTTLS / 465 SSL). |
-| `SMTP_USER` | No | String | `no-reply@livexpert.in` | SMTP authentication username. |
-| `SMTP_PASS` | No | String | `SecretAppPassword!` | SMTP authentication password. |
-| `SMTP_FROM` | No | String | `Livexpert Security <security@livexpert.in>` | From header on password reset and notification emails. |
 
 ---
 
@@ -154,11 +149,11 @@ Server Port                         | ✅ PASS | Configured on port 5000
 2. Create `.env.production` from `.env.production.example` and set strong passwords.
 3. Launch the full production stack:
    ```bash
-   docker compose -f docker-compose.prod.yml up -d --build
+   docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
    ```
 4. Verify running containers:
    ```bash
-   docker compose -f docker-compose.prod.yml ps
+   docker compose --env-file .env.production -f docker-compose.prod.yml ps
    ```
    Containers `kibo360-prod-postgres`, `kibo360-prod-backend`, and `kibo360-prod-frontend` should display status `Up (healthy)`.
 
@@ -167,7 +162,7 @@ Server Port                         | ✅ PASS | Configured on port 5000
 1. Create `.env.staging` from `.env.staging.example`.
 2. Launch the staging stack:
    ```bash
-   docker compose -f docker-compose.staging.yml up -d --build
+   docker compose --env-file .env.staging -f docker-compose.staging.yml up -d --build
    ```
 3. Run the automated staging verification test:
    ```bash

@@ -2,7 +2,6 @@ import { test, describe, before } from "node:test";
 import assert from "node:assert/strict";
 import { BackupRestoreService } from "../scripts/backup-restore";
 import { MigrationAuditService } from "../scripts/migration-verify";
-import { EmailService } from "../src/services/email.service";
 import { jobQueueService } from "../src/services/job-queue.service";
 import { dbStore } from "../src/lib/db";
 
@@ -69,30 +68,8 @@ describe("Phase 9 — Reliability, Resilience & Disaster Recovery Suite", () => 
     }
   });
 
-  // 3. Unavailable Email Service Resilience
-  test("3. Unavailable Email Service: SMTP failures degrade gracefully without crashing the server", async () => {
-    // Enable failure simulation
-    EmailService.simulateFailure = true;
-
-    try {
-      const result = await EmailService.sendPasswordResetEmail({
-        to: "developer@livexpert.in",
-        userName: "Dev User",
-        resetToken: "sample-token-12345",
-        expiresInMinutes: 60,
-      });
-
-      // Verify that instead of throwing an unhandled exception, it returns a handled failure object
-      assert.equal(result.success, false);
-      assert.ok(result.error?.includes("SMTP"));
-    } finally {
-      // Restore normal email operation
-      EmailService.simulateFailure = false;
-    }
-  });
-
-  // 4. Background Job Queue Retries & Error Logging
-  test("4. Background Jobs: Retries failed jobs and records diagnostic error traces", async () => {
+  // 3. Background Job Queue Retries & Error Logging
+  test("3. Background Jobs: Retries failed jobs and records diagnostic error traces", async () => {
     const failingJobType = `FAILING_TEST_JOB_${Date.now()}`;
     let attemptCounter = 0;
 

@@ -19,17 +19,17 @@ KIBO360 implements strict hierarchical role boundaries across all API endpoints 
 
 ## 2. User & Identity Management
 
-Navigate to **User Management** in the sidebar (accessible only by `ADMINISTRATOR`).
+Navigate to **User Management** in the sidebar. Only the designated super admin can create accounts or change roles.
 
-### 2.1 Inviting a New Colleague
-1. Click **+ Invite User** in the top-right toolbar.
-2. Enter the employee's corporate details:
+### 2.1 Creating a User
+Only the designated super admin can create accounts. Click **Create User** in User Management and enter:
    - **First & Last Name**
    - **Email Address** (`@livexpert.in`)
+   - **Initial Password**
    - **Assigned Department**: Select `Software / IT` or `Product / Design`.
    - **System Role**: Select `EMPLOYEE`, `TEAM_LEAD`, or `PROJECT_MANAGER`.
    - **Job Title**: E.g., `Senior Backend Engineer`, `UI/UX Designer`.
-3. Click **Send Invitation**. The system provisions the account with `isInvited: true` and dispatches an invitation link.
+Click **Create User**. The account is active immediately and can sign in with the password set by the super admin. No invitation email is sent.
 
 ### 2.2 Promoting or Altering Roles
 1. In the User Directory table, locate the target user.
@@ -58,7 +58,7 @@ All sensitive administrative, authentication, and security-relevant actions gene
 ### 3.1 Audited Event Types
 - `USER_LOGIN` / `USER_LOGOUT` — Authentication tracking with client IP.
 - `PASSWORD_RESET_REQUESTED` / `PASSWORD_RESET_COMPLETED` — Credential lifecycle events.
-- `USER_INVITED` / `USER_UPDATED` / `USER_DEACTIVATED` — Directory management.
+- `SUPER_ADMIN_USER_CREATED` / `ROLE_CHANGED` / `USER_STATUS_UPDATED` — Directory management.
 - `ROLE_CHANGED` / `DEPARTMENT_CHANGED` — Permission boundary shifts.
 - `PROJECT_CREATED` / `PROJECT_UPDATED` / `PROJECT_ARCHIVED` — Project portfolio tracking.
 - `REPORT_EXPORTED` — Data exfiltration monitoring (captures export type, filters, and record count).
@@ -79,7 +79,7 @@ The backend exposes three health endpoints designed for uptime monitors, load ba
 ### 4.1 Detailed Diagnostic Health Check (`GET /api/v1/health`)
 Provides full subsystem status:
 ```bash
-curl -s http://localhost:5000/api/v1/health | jq .
+  curl -s http://localhost:5002/api/v1/health | jq .
 ```
 Sample response:
 ```json
@@ -149,5 +149,5 @@ Configured in [`backend/src/middleware/rateLimiter.ts`](file:///C:/Users/ajit/.g
 | :--- | :--- | :---: | :---: | :--- |
 | `apiLimiter` | `/api/v1/*` | 1,000 req | 15 mins | General API protection against scraping and DoS. |
 | `loginLimiter` | `/api/v1/auth/login` | 10 attempts | 15 mins | Brute-force credential stuffing mitigation. |
-| `passwordResetLimiter` | `/api/v1/auth/forgot-password` | 5 attempts | 15 mins | Outbound SMTP spam and enumeration defense. |
+| `passwordResetLimiter` | `/api/v1/auth/reset-password` | 5 attempts | 15 mins | Limits authenticator-based password reset attempts. |
 | `exportLimiter` | `/api/v1/reports/export/:type` | 30 exports | 15 mins | Heavy CSV reporting resource exhaustion defense. |

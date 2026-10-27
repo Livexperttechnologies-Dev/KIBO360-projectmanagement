@@ -6,19 +6,36 @@ const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax" as const,
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  maxAge: AuthService.SESSION_LIFETIME_MS,
 };
 
 export async function login(req: Request, res: Response, next: NextFunction) {
   try {
-    const { email, password } = req.body;
+    const { email, password, authenticatorCode } = req.body;
     const ipAddress = req.ip || req.socket.remoteAddress;
     const userAgent = req.headers["user-agent"];
 
-    const result = await AuthService.login(email, password, ipAddress, userAgent);
+    const result = await AuthService.login(email, password, ipAddress, userAgent, authenticatorCode);
+
+    if ("requiresTwoFactor" in result && result.requiresTwoFactor) {
+      res.status(200).json({
+        success: true,
+        data: {
+          requiresTwoFactor: true,
+          requiresEnrollment: Boolean(result.requiresEnrollment),
+          usesSuperAdminAuthenticator: Boolean(result.usesSuperAdminAuthenticator),
+          ...(result.message ? { message: result.message } : {}),
+          ...("setupSecret" in result && result.setupSecret && "setupUri" in result && result.setupUri ? { setupSecret: result.setupSecret, setupUri: result.setupUri } : {}),
+        },
+      });
+      return;
+    }
 
     // Set secure HTTP-only cookies
-    res.cookie("refresh_token", result.refreshToken, COOKIE_OPTIONS);
+    res.cookie("refresh_token", result.refreshToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: Math.max(0, (result.refreshTokenExpiresAt?.getTime() ?? Date.now() + AuthService.SESSION_LIFETIME_MS) - Date.now()),
+    });
     res.cookie("access_token", result.accessToken, {
       ...COOKIE_OPTIONS,
       maxAge: 15 * 60 * 1000, // 15 mins
@@ -64,7 +81,10 @@ export async function refresh(req: Request, res: Response, next: NextFunction) {
 
     const result = await AuthService.refreshSession(refreshToken, ipAddress, userAgent);
 
-    res.cookie("refresh_token", result.refreshToken, COOKIE_OPTIONS);
+    res.cookie("refresh_token", result.refreshToken, {
+      ...COOKIE_OPTIONS,
+      maxAge: Math.max(0, result.refreshTokenExpiresAt.getTime() - Date.now()),
+    });
     res.cookie("access_token", result.accessToken, {
       ...COOKIE_OPTIONS,
       maxAge: 15 * 60 * 1000,
@@ -82,34 +102,60 @@ export async function refresh(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-export async function forgotPassword(req: Request, res: Response, next: NextFunction) {
+export async function resetPassword(req: Request, res: Response, next: NextFunction) {
   try {
-    const { email } = req.body;
+    const { email, authenticatorCode, newPassword } = req.body;
     const ipAddress = req.ip || req.socket.remoteAddress;
 
-    const result = await AuthService.requestPasswordReset(email, ipAddress);
+    const result = await AuthService.resetPasswordWithAuthenticator(email, authenticatorCode, newPassword, ipAddress);
 
     res.status(200).json({
       success: true,
       message: result.message,
-      ...(result.debugToken ? { debugToken: result.debugToken } : {}),
     });
   } catch (error) {
     next(error);
   }
 }
 
-export async function resetPassword(req: Request, res: Response, next: NextFunction) {
+export async function getTwoFactorSettings(req: Request, res: Response, next: NextFunction) {
   try {
-    const { token, newPassword } = req.body;
-    const ipAddress = req.ip || req.socket.remoteAddress;
+    const user = req.user!;
+    res.status(200).json({ success: true, data: AuthService.getTwoFactorSettings(user.userId, user.email, user.role) });
+  } catch (error) {
+    next(error);
+  }
+}
 
-    const result = await AuthService.resetPassword(token, newPassword, ipAddress);
+export async function startAuthenticatorEnrollment(req: Request, res: Response, next: NextFunction) {
+  try {
+    const setup = await AuthService.startAuthenticatorEnrollment(req.user!.userId, req.body.password);
+    res.status(200).json({ success: true, data: setup });
+  } catch (error) {
+    next(error);
+  }
+}
 
-    res.status(200).json({
-      success: true,
-      message: result.message,
-    });
+export async function verifyAuthenticatorEnrollment(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await AuthService.verifyAuthenticatorEnrollment(req.user!.userId, req.body.password, req.body.authenticatorCode);
+    res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function setGlobalTwoFactorEnforcement(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = req.user!;
+    const result = await AuthService.setGlobalTwoFactorEnforcement(
+      user.userId,
+      user.email,
+      user.role,
+      req.body.enabled,
+      req.body.authenticatorCode
+    );
+    res.status(200).json({ success: true, data: result, message: "Organization-wide authenticator policy updated" });
   } catch (error) {
     next(error);
   }

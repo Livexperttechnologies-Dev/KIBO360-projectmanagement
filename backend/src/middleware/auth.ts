@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { AuthService, TokenPayload } from "../services/auth.service";
 import { dbStore, Role } from "../lib/db";
+import { isDesignatedSuperAdmin } from "../lib/superAdmin";
 
 // Extend Express Request
 declare global {
@@ -112,4 +113,12 @@ export const requireRole = (...roles: Role[]) => {
 
     next();
   };
+};
+
+export const requireSuperAdmin = (req: Request, res: Response, next: NextFunction): void => {
+  if (!req.user || !isDesignatedSuperAdmin(req.user.userId, req.user.role)) {
+    res.status(403).json({ success: false, error: { message: "Only the designated super admin can perform this action." } });
+    return;
+  }
+  next();
 };

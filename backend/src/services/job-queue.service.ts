@@ -1,4 +1,5 @@
 import { dbStore, BackgroundJobRecord, JobStatus } from "../lib/db";
+import { persistStore } from "../lib/persistence";
 
 export type JobHandler = (payload: any) => Promise<any>;
 
@@ -18,6 +19,7 @@ export class JobQueueService {
    */
   public async addJob(jobName: string, payload?: any, maxAttempts = 3): Promise<BackgroundJobRecord> {
     const job = dbStore.createBackgroundJob(jobName, payload, maxAttempts);
+    await persistStore();
     // Process asynchronously without blocking caller
     setImmediate(() => {
       this.processQueue().catch((err) => {
@@ -82,6 +84,7 @@ export class JobQueueService {
       }
     } finally {
       this.isProcessing = false;
+      await persistStore();
     }
 
     return { processed, errors };
@@ -93,6 +96,7 @@ export class JobQueueService {
   public async retryJob(jobId: string): Promise<BackgroundJobRecord | null> {
     const job = dbStore.retryBackgroundJob(jobId);
     if (job) {
+      await persistStore();
       setImmediate(() => {
         this.processQueue().catch((err) => {
           console.error(`[JobQueueService] Retry error for job ${jobId}:`, err);

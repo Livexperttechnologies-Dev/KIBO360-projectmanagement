@@ -336,23 +336,18 @@ export async function deleteTaskComment(
 
 export async function addTaskAttachment(
   taskId: string,
-  attachmentData: {
-    filename: string;
-    filesize: number;
-    mimetype: string;
-    fileUrl: string;
-    accessScope?: string;
-  },
+  file: File,
+  accessScope: string,
   token: string | null
 ): Promise<TaskAttachment> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("accessScope", accessScope);
   const res = await fetch(`${API_BASE_URL}/tasks/${taskId}/attachments`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
     credentials: "include",
-    body: JSON.stringify(attachmentData),
+    body: formData,
   });
 
   const data = await res.json();
@@ -361,6 +356,18 @@ export async function addTaskAttachment(
   }
 
   return data.data.attachment;
+}
+
+export async function downloadTaskAttachment(taskId: string, attachmentId: string, token: string | null): Promise<Blob> {
+  const res = await fetch(`${API_BASE_URL}/tasks/${taskId}/attachments/${attachmentId}/download`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.error?.message || "Failed to download attachment");
+  }
+  return res.blob();
 }
 
 export async function deleteTaskAttachment(

@@ -5,27 +5,24 @@ export const loginSchema = z.object({
     email: z.string().email("Please enter a valid company email address"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     rememberMe: z.boolean().optional(),
-  }),
-});
-
-export const forgotPasswordSchema = z.object({
-  body: z.object({
-    email: z.string().email("Please enter a valid company email address"),
+    authenticatorCode: z.string().regex(/^\d{6}$/).optional(),
   }),
 });
 
 export const resetPasswordSchema = z.object({
   body: z.object({
-    token: z.string().min(1, "Reset token is required"),
+    email: z.string().email("Please enter a valid company email address"),
+    authenticatorCode: z.string().regex(/^\d{6}$/, "Enter the 6-digit code from Google Authenticator").optional(),
     newPassword: z.string().min(8, "Password must be at least 8 characters"),
   }),
 });
 
-export const inviteUserSchema = z.object({
+export const createUserSchema = z.object({
   body: z.object({
     email: z.string().email("Please enter a valid company email address"),
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
     role: z.enum(["ADMINISTRATOR", "PROJECT_MANAGER", "TEAM_LEAD", "EMPLOYEE"]),
     departmentId: z.string().min(1, "Department assignment is required"),
     jobTitle: z.string().optional(),
@@ -46,6 +43,19 @@ export const updateUserProfileSchema = z.object({
     phone: z.string().optional(),
     bio: z.string().optional(),
   }),
+});
+
+export const superAdminUserUpdateSchema = z.object({
+  body: z.object({
+    email: z.string().email("Please enter a valid email address"),
+    firstName: z.string().min(1, "First name is required"),
+    lastName: z.string().min(1, "Last name is required"),
+    jobTitle: z.string().optional(),
+  }),
+});
+
+export const superAdminSetPasswordSchema = z.object({
+  body: z.object({ password: z.string().min(8, "Password must be at least 8 characters") }),
 });
 
 export const assignDepartmentSchema = z.object({

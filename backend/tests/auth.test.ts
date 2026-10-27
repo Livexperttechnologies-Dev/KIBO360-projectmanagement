@@ -136,67 +136,54 @@ describe("Phase 2 â€” Authentication and User Management Suite", () => {
   });
 
   // 7. Password Reset Flow
-  test("7. Password reset generates token, dispatches email, and updates credentials", async () => {
+  test("7. Password reset requires an authenticator code instead of an email token", async () => {
     const user = dbStore.findUserByEmail("lead@livexpert.in")!;
 
-    // Request reset
-    const reqRes = await AuthService.requestPasswordReset(user.email);
-    assert.equal(reqRes.success, true);
-    assert.ok(reqRes.debugToken, "Debug token must be returned in non-prod");
-
     const newPass = "NewSecurePassword#2026";
-    const resetRes = await AuthService.resetPassword(reqRes.debugToken!, newPass);
-    assert.equal(resetRes.success, true);
+    await assert.rejects(() => AuthService.resetPasswordWithAuthenticator(user.email, "000000", newPass));
 
-    // Verify old password fails
-    await assert.rejects(async () => {
-      await AuthService.login(user.email, "Livexpert@2026");
-    });
-
-    // Verify new password succeeds
-    const loginRes = await AuthService.login(user.email, newPass);
+    // Rejected reset leaves the existing password intact.
+    await assert.rejects(() => AuthService.login(user.email, newPass));
+    const loginRes = await AuthService.login(user.email, "Livexpert@2026");
+    assert.ok("user" in loginRes && loginRes.user);
     assert.equal(loginRes.user.email, user.email);
-
-    // Reset back to default
-    await AuthService.resetPassword(
-      (await AuthService.requestPasswordReset(user.email)).debugToken!,
-      "Livexpert@2026"
-    );
   });
 
-  // 8. Admin User Management (Invite, Department Assignment, Profile Update)
-  test("8. Admin user operations (Invite, Department, Profile, Role)", async () => {
+  // 8. Super-admin User Management (Create, Department Assignment, Profile Update)
+  test("8. Super-admin user operations (Create, Department, Profile, Role)", async () => {
     const newEmail = "new.engineer@livexpert.in";
 
-    // Invite User
-    const inviteRes = await UserService.inviteUser({
+    // Create User directly with an initial password
+    const createRes = await UserService.createUser({
       email: newEmail,
       firstName: "Neha",
       lastName: "Sharma",
+      password: "NehaSecure#2026",
       role: "TEAM_LEAD",
       departmentId: "dept-sw", // Software / IT
       jobTitle: "Senior Platform Architect",
       actorUserId: "usr-admin-01",
     });
 
-    assert.equal(inviteRes.user.email, newEmail);
-    assert.equal(inviteRes.user.role, "TEAM_LEAD");
-    assert.equal(inviteRes.user.department?.name, "Software / IT");
+    assert.equal(createRes.user.email, newEmail);
+    assert.equal(createRes.user.role, "TEAM_LEAD");
+    assert.equal(createRes.user.isInvited, false);
+    assert.equal(createRes.user.department?.name, "Software / IT");
 
     // Profile update
     const updated = await UserService.updateUserProfile({
-      userId: inviteRes.user.id,
+      userId: createRes.user.id,
       bio: "Cloud infrastructure enthusiast",
       phone: "+91 99999 88888",
     });
     assert.equal(updated.profile?.bio, "Cloud infrastructure enthusiast");
 
     // Reassign department to Product / Design
-    const deptUpdate = await UserService.assignDepartment(inviteRes.user.id, "dept-pd");
+    const deptUpdate = await UserService.assignDepartment(createRes.user.id, "dept-pd");
     assert.equal(deptUpdate.department?.name, "Product / Design");
 
     // Update role
-    const roleUpdate = await UserService.updateUserRole(inviteRes.user.id, "PROJECT_MANAGER");
+    const roleUpdate = await UserService.updateUserRole(createRes.user.id, "PROJECT_MANAGER");
     assert.equal(roleUpdate.role, "PROJECT_MANAGER");
   });
 
@@ -207,7 +194,7 @@ describe("Phase 2 â€” Authentication and User Management Suite", () => {
 
     const actions = logs.map((l) => l.action);
     assert.ok(
-      actions.includes("USER_INVITED") ||
+      actions.includes("SUPER_ADMIN_USER_CREATED") ||
       actions.includes("USER_STATUS_UPDATED") ||
       actions.includes("ROLE_CHANGED") ||
       actions.includes("USER_LOGIN_SUCCESS"),

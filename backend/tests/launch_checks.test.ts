@@ -72,66 +72,22 @@ describe("Phase 10 — Production Launch Checks Suite", () => {
   });
 
   // ----------------------------------------------------------------------------
-  // Check 2: Password Reset Works
+  // Check 2: Password Reset Uses the Authenticator
   // ----------------------------------------------------------------------------
-  test("Launch Check 2: Password reset workflow works with single-use security", async () => {
-    // 2a. Request password reset token
+  test("Launch Check 2: email password-reset links are no longer available", async () => {
     const forgotRes = await fetch(`${BASE_URL}/auth/forgot-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: "lead@livexpert.in" }),
     });
-    assert.equal(forgotRes.status, 200);
-    const forgotData = (await forgotRes.json()) as any;
-    const resetToken = forgotData.debugToken;
-    assert.ok(resetToken, "Reset token must be generated");
+    assert.equal(forgotRes.status, 404);
 
-    // 2b. Complete password reset with new password
-    const newPassword = "Livexpert@New2026!";
     const resetRes = await fetch(`${BASE_URL}/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        token: resetToken,
-        newPassword,
-      }),
+      body: JSON.stringify({ token: "legacy-email-token", newPassword: "Livexpert@New2026!" }),
     });
-    assert.equal(resetRes.status, 200);
-
-    // 2c. Log in with new password -> must succeed
-    const newLoginRes = await fetch(`${BASE_URL}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "lead@livexpert.in", password: newPassword }),
-    });
-    assert.equal(newLoginRes.status, 200);
-
-    // 2d. Replay defense: reusing the same token must fail
-    const replayRes = await fetch(`${BASE_URL}/auth/reset-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        token: resetToken,
-        newPassword: "AnotherPassword123!",
-      }),
-    });
-    assert.equal(replayRes.status, 400, "Consumed password reset token must be rejected");
-
-    // 2e. Restore original password for test consistency
-    const restoreForgot = await fetch(`${BASE_URL}/auth/forgot-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "lead@livexpert.in" }),
-    });
-    const restoreToken = ((await restoreForgot.json()) as any).debugToken;
-    await fetch(`${BASE_URL}/auth/reset-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        token: restoreToken,
-        newPassword: "Livexpert@2026",
-      }),
-    });
+    assert.equal(resetRes.status, 400, "Legacy email reset tokens must be rejected");
   });
 
   // ----------------------------------------------------------------------------

@@ -559,9 +559,9 @@ export const NotificationsPage: React.FC = () => {
 
                       <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-400 font-medium">
                         <span>{formatTimeAgo(item.createdAt)}</span>
-                        {item.entityType === "TASK" && (
+                        {item.entityType === "TASK" && item.entityId && (
                           <Link
-                            to="/tasks"
+                            to={`/team-tasks?taskId=${encodeURIComponent(item.entityId || "")}`}
                             className="flex items-center gap-1 text-[#690BA8] font-bold hover:underline"
                           >
                             <span>View Task</span>

@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { TaskService } from "../services/task.service";
+import path from "path";
+import { uploadDirectory } from "../middleware/upload";
 
 export async function listTasks(req: Request, res: Response, next: NextFunction) {
   try {
@@ -173,13 +175,36 @@ export async function addAttachment(req: Request, res: Response, next: NextFunct
     const user = req.user!;
     const taskId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
-    const attachment = await TaskService.addAttachment(taskId, req.body, user);
+    if (!req.file) {
+      const error: any = new Error("Choose a file to upload");
+      error.statusCode = 400;
+      throw error;
+    }
+    const attachment = await TaskService.addAttachment(taskId, {
+      filename: req.file.originalname,
+      filesize: req.file.size,
+      mimetype: req.file.mimetype,
+      fileUrl: req.file.filename,
+      accessScope: req.body.accessScope,
+    }, user);
 
     res.status(201).json({
       success: true,
       message: "Attachment uploaded successfully",
       data: { attachment },
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function downloadAttachment(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = req.user!;
+    const taskId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const attachmentId = Array.isArray(req.params.attachmentId) ? req.params.attachmentId[0] : req.params.attachmentId;
+    const attachment = TaskService.getAttachmentForDownload(taskId, attachmentId, user);
+    res.download(path.join(uploadDirectory, path.basename(attachment.fileUrl)), attachment.filename);
   } catch (error) {
     next(error);
   }

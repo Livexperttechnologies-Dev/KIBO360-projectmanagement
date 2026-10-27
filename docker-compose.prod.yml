@@ -1,28 +1,26 @@
 # ==============================================================================
-# KIBO360 Project Hub — Production Docker Compose Orchestration
+# KIBO360 Project Hub — Dokploy Production Docker Compose Orchestration
 # Livexpert Technologies Pvt. Ltd.
 # ==============================================================================
-
-version: "3.8"
 
 services:
   # 1. Production PostgreSQL Database
   postgres:
     image: postgres:16-alpine
-    container_name: kibo360-prod-postgres
     restart: always
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-kibo360_hub}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Production PostgreSQL password must be set}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Production application database password must be set}
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - kibo360_pgdata:/var/lib/postgresql/data
-      - ./deployment/scripts/init-prod-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./deployment/scripts/init-prod-db.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+      # Keep the SQL beside the init script but outside PostgreSQL's auto-run extension.
+      - ./deployment/scripts/init-prod-db.sql:/docker-entrypoint-initdb.d/init-prod-db.sql.disabled:ro
     networks:
       - kibo360-internal
-    ports:
-      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-kibo360_hub}"]
       interval: 10s
@@ -30,28 +28,77 @@ services:
       retries: 5
       start_period: 10s
 
+  # Apply checked-in Prisma migrations before the API starts.
+  backend-migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: builder
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://kibo360_app:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-kibo360_hub}?schema=public
+    command: ["npx", "prisma", "migrate", "deploy"]
+    networks:
+      - kibo360-internal
+
+  # Provision the configured super-admin account once. Re-deploys never
+  # overwrite an existing account's password.
+  backend-bootstrap:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: builder
+    restart: "no"
+    depends_on:
+      backend-migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://kibo360_app:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-kibo360_hub}?schema=public
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:?Set the super-admin email}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:?Set a strong initial admin password}
+      INITIAL_ADMIN_NAME: ${INITIAL_ADMIN_NAME:?Set the super-admin display name}
+    command: ["node", "dist/src/scripts/bootstrap-admin.js"]
+    networks:
+      - kibo360-internal
+
   # 2. Production Node.js Backend API
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: kibo360-prod-backend
     restart: always
     depends_on:
-      postgres:
-        condition: service_healthy
-    env_file:
-      - .env.production
+      backend-migrate:
+        condition: service_completed_successfully
+      backend-bootstrap:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: production
       PORT: 5000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kibo360_hub}?schema=public
+      DATABASE_URL: postgresql://kibo360_app:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-kibo360_hub}?schema=public
+      FRONTEND_URL: ${FRONTEND_URL:?Set the public application URL}
+      CORS_ORIGIN: ${CORS_ORIGIN:?Set the allowed browser origin}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:?Set the super-admin email}
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?Set a unique 64-character hex key}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Set a unique access-token secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set a unique refresh-token secret}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
+      COMPANY_TIMEZONE: ${COMPANY_TIMEZONE:-Asia/Kolkata}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-1000}
     networks:
       - kibo360-internal
-    ports:
-      - "127.0.0.1:5000:5000"
+    expose:
+      - "5000"
     volumes:
       - backend_logs:/app/logs
+      - backend_uploads:/app/uploads
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/api/v1/health/liveness || exit 1"]
       interval: 15s
@@ -66,17 +113,14 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: /api/v1
-    container_name: kibo360-prod-frontend
     restart: always
     depends_on:
       backend:
         condition: service_healthy
-    ports:
-      - "80:80"
-      - "443:443"
+    expose:
+      - "80"
     volumes:
-      - ./deployment/nginx/kibo360.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./deployment/ssl:/etc/nginx/ssl:ro
+      - ./deployment/nginx/dokploy.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - kibo360-internal
 
@@ -89,3 +133,5 @@ volumes:
     name: kibo360_prod_pgdata
   backend_logs:
     name: kibo360_prod_logs
+  backend_uploads:
+    name: kibo360_prod_uploads

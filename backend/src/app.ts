@@ -7,6 +7,7 @@ import apiRoutes from "./routes";
 import { errorHandler } from "./middleware/errorHandler";
 import { notFound } from "./middleware/notFound";
 import { apiLimiter } from "./middleware/rateLimiter";
+import { persistStore } from "./lib/persistence";
 
 const app = express();
 
@@ -22,12 +23,12 @@ app.use(
       if (
         origin === env.CORS_ORIGIN ||
         origin === env.FRONTEND_URL ||
-        origin.startsWith("http://localhost:") ||
-        origin.startsWith("http://127.0.0.1:")
+        (env.NODE_ENV !== "production" &&
+          (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")))
       ) {
         return callback(null, true);
       }
-      return callback(null, true);
+      return callback(new Error("Origin is not allowed by CORS"));
     },
     credentials: true,
   })
@@ -49,6 +50,33 @@ app.use((req, res, next) => {
   });
   next();
 });
+
+// Save mutations before sending their response so a successful API response
+// means its data has been committed to PostgreSQL.
+if (process.env.NODE_ENV !== "test") {
+  app.use((req, res, next) => {
+    if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
+
+    const sendJson = res.json.bind(res);
+    let saveStarted = false;
+    res.json = ((body: any) => {
+      if (saveStarted) return res;
+      saveStarted = true;
+
+      void persistStore()
+        .then(() => sendJson(body))
+        .catch((error) => {
+          console.error("Could not persist API changes to PostgreSQL:", error);
+          if (!res.headersSent) {
+            res.status(503);
+            sendJson({ success: false, error: { message: "Could not save changes to the database" } });
+          }
+        });
+      return res;
+    }) as typeof res.json;
+    next();
+  });
+}
 
 // Root ping
 app.get("/", (_req, res) => {

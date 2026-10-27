@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Lock, Eye, EyeOff, CheckCircle, ArrowRight, Info, ShieldCheck } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
@@ -7,15 +7,12 @@ import { Button } from "../../components/ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
 
 export const ResetPasswordPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { resetPassword } = useAuth();
 
-  const token = searchParams.get("token") || "";
-  const emailParam = searchParams.get("email") || "";
-  const isInvite = searchParams.get("invite") === "true";
-
   const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [authenticatorCode, setAuthenticatorCode] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -26,8 +23,8 @@ export const ResetPasswordPage: React.FC = () => {
     e.preventDefault();
     setError("");
 
-    if (!token) {
-      setError("Reset token is missing or invalid. Please request a new link.");
+    if (!email || !/^\d{6}$/.test(authenticatorCode)) {
+      setError("Enter your account email and 6-digit Google Authenticator code.");
       return;
     }
 
@@ -43,10 +40,10 @@ export const ResetPasswordPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await resetPassword(token, password);
+      await resetPassword(email, authenticatorCode, password);
       setIsSuccess(true);
     } catch (err: any) {
-      setError(err.message || "Failed to update password. The link may have expired.");
+      setError(err.message || "Failed to reset the password. Check the authenticator code and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -60,7 +57,7 @@ export const ResetPasswordPage: React.FC = () => {
             <img src="/kibo360-logo.png" alt="KIBO360 Logo" className="h-12 w-auto object-contain" />
           </div>
           <h2 className="mt-4 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
-            {isInvite ? "Activate Your Account" : "Set New Password"}
+            Set New Password
           </h2>
           <p className="mt-1 text-xs text-slate-500 font-medium">
             Livexpert Technologies Enterprise Security
@@ -75,10 +72,10 @@ export const ResetPasswordPage: React.FC = () => {
                   <CheckCircle className="h-8 w-8" />
                 </div>
                 <h3 className="text-lg font-bold text-slate-900">
-                  {isInvite ? "Account Successfully Activated!" : "Password Updated Successfully!"}
+                  Password Updated Successfully!
                 </h3>
                 <p className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
-                  Your credentials have been securely updated in the database. You may now log in to the KIBO360 Project Hub.
+                  Your password has been updated. Sign in with your new password and Google Authenticator code.
                 </p>
                 <div className="pt-2">
                   <Button
@@ -94,12 +91,6 @@ export const ResetPasswordPage: React.FC = () => {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
-                {emailParam && (
-                  <div className="rounded-xl bg-purple-50 p-3 text-xs text-purple-900 border border-purple-200">
-                    Setting password for: <strong>{emailParam}</strong>
-                  </div>
-                )}
-
                 {error && (
                   <div className="rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs text-rose-800 flex items-start gap-2">
                     <Info className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
@@ -107,6 +98,8 @@ export const ResetPasswordPage: React.FC = () => {
                   </div>
                 )}
 
+                <Input label="Account email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Input label="Super admin Google Authenticator code" inputMode="numeric" maxLength={6} value={authenticatorCode} onChange={(e) => setAuthenticatorCode(e.target.value.replace(/\D/g, "").slice(0, 6))} leftIcon={<ShieldCheck className="h-4 w-4" />} />
                 <Input
                   label="New Password"
                   type={showPassword ? "text" : "password"}
@@ -144,7 +137,7 @@ export const ResetPasswordPage: React.FC = () => {
                   isLoading={isSubmitting}
                   rightIcon={<ArrowRight className="h-4 w-4" />}
                 >
-                  {isInvite ? "Activate Account" : "Reset Password"}
+                  Reset Password
                 </Button>
 
                 <div className="text-center pt-2">

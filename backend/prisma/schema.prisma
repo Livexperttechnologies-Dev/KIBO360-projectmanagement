@@ -91,7 +91,6 @@ model User {
   refreshTokens   RefreshToken[]
   passwordResets  PasswordResetToken[]
   auditLogs       AuditLog[]           @relation("UserAuditLogs")
-  targetAuditLogs AuditLog[]           @relation("TargetUserAuditLogs")
   createdProjects    Project[]         @relation("ProjectCreator")
   ownedProjects      Project[]         @relation("ProjectOwner")
   projectMemberships ProjectMember[]
@@ -103,6 +102,7 @@ model User {
   teams              TeamMember[]
   notifications      Notification[]
   notificationPreference NotificationPreference?
+  twoFactor              UserTwoFactor?
 
   @@map("users")
 }
@@ -132,12 +132,36 @@ model RefreshToken {
   revokedAt DateTime? @map("revoked_at")
   ipAddress String?   @map("ip_address")
   userAgent String?   @map("user_agent")
+  twoFactorVerified Boolean @default(false) @map("two_factor_verified")
   createdAt DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+model UserTwoFactor {
+  id               String   @id @default(uuid())
+  userId           String   @unique @map("user_id")
+  encryptedSecret  String   @map("encrypted_secret")
+  enabled          Boolean  @default(false)
+  lastVerifiedStep Int?     @map("last_verified_step")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_two_factors")
+}
+
+model SecuritySetting {
+  id                     String   @id
+  globalTwoFactorEnabled Boolean  @default(false) @map("global_two_factor_enabled")
+  updatedBy              String?  @map("updated_by")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@map("security_settings")
 }
 
 model PasswordResetToken {
@@ -166,8 +190,6 @@ model AuditLog {
   createdAt DateTime @default(now()) @map("created_at")
 
   user       User? @relation("UserAuditLogs", fields: [userId], references: [id], onDelete: SetNull)
-  targetUser User? @relation("TargetUserAuditLogs", fields: [targetId], references: [id], onDelete: SetNull)
-
   @@index([userId])
   @@index([targetId])
   @@index([action])

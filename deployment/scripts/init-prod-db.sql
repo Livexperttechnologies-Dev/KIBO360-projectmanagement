@@ -8,21 +8,12 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- 2. Create unprivileged application service user if not exists
-DO
-$do$
-BEGIN
-   IF NOT EXISTS (
-      SELECT FROM pg_catalog.pg_roles
-      WHERE  rolname = 'kibo360_app') THEN
-
-      CREATE ROLE kibo360_app WITH LOGIN PASSWORD 'LivexpertProd2026SecureApp!';
-   END IF;
-END
-$do$;
+-- 2. Create the unprivileged application user using the deployment secret.
+-- The init-prod-db.sh wrapper passes this psql variable from POSTGRES_APP_PASSWORD.
+CREATE ROLE kibo360_app WITH LOGIN PASSWORD :'app_password';
 
 -- 3. Grant schema permissions
-GRANT CONNECT ON DATABASE kibo360_hub TO kibo360_app;
+GRANT CONNECT ON DATABASE :"database_name" TO kibo360_app;
 GRANT USAGE, CREATE ON SCHEMA public TO kibo360_app;
 
 -- 4. Set Default Table and Sequence Permissions

@@ -23,7 +23,6 @@
 | **Security & Auth** | Bcryptjs, JSON Web Tokens (JWT), HTTP-only Cookies, Express-Rate-Limit, Helmet |
 | **Database & ORM** | PostgreSQL, Prisma ORM (with migration SQL DDL and seed store) |
 | **Dashboard Telemetry**| Dynamic KPI metrics, Filter Engine, Workload Allocation, Milestone Schedules |
-| **Email Abstraction** | SMTP Provider Integration (with development console fallback) |
 | **Testing** | Node.js Test Runner (`node:test`, `node:assert`) |
 
 ---
@@ -60,7 +59,7 @@
 ## Roles and Departments
 
 ### Approved Roles
-- **Administrator**: Full administrative control, user invitation, role assignment, account activation/deactivation, audit trail access.
+- **Administrator**: Administrative control, account activation/deactivation, and audit trail access. The designated super admin creates users and assigns roles.
 - **Project Manager**: Access to project planning, team tasks, workload tracking, and user directory.
 - **Team Lead**: Sprint milestone coordination, technical deliverables, and department task allocation.
 - **Employee**: Individual task view, completion tracking, personal dashboard, and profile management.
@@ -73,17 +72,9 @@
 
 ---
 
-## Seed Accounts (Pre-configured for Testing)
+## Production deployment
 
-All seed accounts are initialized with the default password: **`Livexpert@2026`**
-
-| Role | Email | Department | Description |
-| :--- | :--- | :--- | :--- |
-| **Administrator** | `admin@livexpert.in` | Software / IT | System & Cloud Administrator |
-| **Project Manager**| `pm@livexpert.in` | Product / Design | Lead Technical Product Manager |
-| **Team Lead** | `lead@livexpert.in` | Software / IT | Technical Lead |
-| **Employee** | `dev@livexpert.in` | Software / IT | Full Stack Engineer |
-| **Deactivated User** | `inactive@livexpert.in` | Software / IT | Tests immediate access revocation |
+Production does not create demo projects or demo accounts. For a fresh Dokploy deployment, follow the [Dokploy deployment guide](docs/deployment/dokploy.md). It describes domain/TLS setup, required secrets, the initial super-admin account, database migrations, and post-deploy checks.
 
 ---
 
@@ -111,8 +102,8 @@ npm run dev
   - Dashboard: [http://localhost:5173/dashboard](http://localhost:5173/dashboard)
   - User Management: [http://localhost:5173/users](http://localhost:5173/users)
   - Login Page: [http://localhost:5173/login](http://localhost:5173/login)
-- **Backend API**: [http://localhost:5000](http://localhost:5000)
-  - Health Endpoint: [http://localhost:5000/api/v1/health](http://localhost:5000/api/v1/health)
+- **Backend API**: [http://localhost:5002](http://localhost:5002)
+  - Health Endpoint: [http://localhost:5002/api/v1/health](http://localhost:5002/api/v1/health)
 
 ---
 

@@ -9,8 +9,10 @@ module.exports = {
       name: "kibo360-backend",
       script: "dist/src/index.js",
       cwd: "./",
-      instances: "max",
-      exec_mode: "cluster",
+      // Keep one process until every runtime read is served directly from PostgreSQL.
+      // This also ensures the in-process scheduler is started only once.
+      instances: 1,
+      exec_mode: "fork",
       autorestart: true,
       watch: false,
       max_memory_restart: "500M",

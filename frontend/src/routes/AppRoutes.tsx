@@ -14,6 +14,7 @@ import { NotificationsPage } from "../pages/NotificationsPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { UserManagementPage } from "../pages/admin/UserManagementPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
+import { ProfilePage } from "../pages/ProfilePage";
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -40,6 +41,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="reports" element={<ReportsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="profile" element={<ProfilePage />} />
 
         {/* Administrator Protected Route */}
         <Route

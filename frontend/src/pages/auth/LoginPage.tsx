@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Mail,
   Lock,
@@ -9,8 +9,6 @@ import {
   ArrowRight,
   Info,
   CheckCircle,
-  KeyRound,
-  ExternalLink,
 } from "lucide-react";
 import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
@@ -25,6 +23,8 @@ export const LoginPage: React.FC = () => {
 
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
+  const [authenticatorCode, setAuthenticatorCode] = useState("");
+  const [loginChallenge, setLoginChallenge] = useState<{ requiresEnrollment?: boolean; setupSecret?: string; setupUri?: string; usesSuperAdminAuthenticator?: boolean; message?: string } | null>(null);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [rememberMe, setRememberMe] = useState<boolean>(false);
 
@@ -37,12 +37,13 @@ export const LoginPage: React.FC = () => {
   // Forgot Password Modal
   const [isForgotModalOpen, setIsForgotModalOpen] = useState<boolean>(false);
   const [forgotEmail, setForgotEmail] = useState<string>("");
+  const [forgotCode, setForgotCode] = useState("");
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
   const [forgotSubmitted, setForgotSubmitted] = useState<boolean>(false);
   const [forgotMessage, setForgotMessage] = useState<string>("");
-  const [forgotDebugToken, setForgotDebugToken] = useState<string | undefined>();
   const [forgotLoading, setForgotLoading] = useState<boolean>(false);
 
-  const { requestPasswordReset } = useAuth();
+  const { resetPassword } = useAuth();
 
   useEffect(() => {
     if (savedEmail) {
@@ -97,9 +98,14 @@ export const LoginPage: React.FC = () => {
         email: email.trim(),
         password,
         rememberMe,
+        ...(loginChallenge ? { authenticatorCode } : {}),
       });
 
-      if (!result.success) {
+      if (result.challenge) {
+        setLoginChallenge(result.challenge);
+        setAuthenticatorCode("");
+        setGeneralError(result.challenge.message || "");
+      } else if (!result.success) {
         setGeneralError(result.message || "Invalid email or password");
       } else {
         const from = (location.state as any)?.from?.pathname || "/dashboard";
@@ -112,15 +118,14 @@ export const LoginPage: React.FC = () => {
 
   const handleForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail)) {
+    if (!forgotEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail) || !/^\d{6}$/.test(forgotCode) || forgotNewPassword.length < 8) {
       return;
     }
 
     setForgotLoading(true);
     try {
-      const res = await requestPasswordReset(forgotEmail.trim());
+      const res = await resetPassword(forgotEmail.trim(), forgotCode, forgotNewPassword);
       setForgotMessage(res.message);
-      setForgotDebugToken(res.debugToken);
       setForgotSubmitted(true);
     } catch (err: any) {
       setForgotMessage(err.message || "Failed to process reset request");
@@ -128,14 +133,6 @@ export const LoginPage: React.FC = () => {
     } finally {
       setForgotLoading(false);
     }
-  };
-
-  const quickFill = (userEmail: string) => {
-    setEmail(userEmail);
-    setPassword("Livexpert@2026");
-    setEmailError("");
-    setPasswordError("");
-    setGeneralError("");
   };
 
   return (
@@ -194,6 +191,21 @@ export const LoginPage: React.FC = () => {
                 autoComplete="email"
               />
 
+              {loginChallenge && (
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 text-xs text-purple-900">
+                    {loginChallenge.requiresEnrollment
+                      ? "Set up Google Authenticator, then enter the code it displays."
+                      : loginChallenge.usesSuperAdminAuthenticator
+                        ? "Ask the super admin for the current 6-digit Google Authenticator code."
+                        : "Enter the current 6-digit code from your Google Authenticator."}
+                    {loginChallenge.setupSecret && <div className="mt-2 break-all font-mono">Setup key: {loginChallenge.setupSecret}</div>}
+                    {loginChallenge.setupUri && <a className="mt-2 inline-block underline" href={loginChallenge.setupUri}>Open authenticator setup</a>}
+                  </div>
+                  <Input label="Google Authenticator code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={authenticatorCode} onChange={(e) => setAuthenticatorCode(e.target.value.replace(/\D/g, "").slice(0, 6))} leftIcon={<ShieldCheck className="h-4 w-4" />} helperText="Codes refresh every 30 seconds. If one is rejected, wait for the next code; automatic date and time should be enabled on your phone." />
+                </div>
+              )}
+
               {/* Password Input with Show/Hide toggle */}
               <Input
                 label="Password"
@@ -241,7 +253,8 @@ export const LoginPage: React.FC = () => {
                   onClick={() => {
                     setForgotEmail(email);
                     setForgotSubmitted(false);
-                    setForgotDebugToken(undefined);
+                    setForgotCode("");
+                    setForgotNewPassword("");
                     setIsForgotModalOpen(true);
                   }}
                   className="font-semibold text-[#690BA8] hover:text-[#340771] hover:underline"
@@ -263,55 +276,6 @@ export const LoginPage: React.FC = () => {
               </Button>
             </form>
 
-            {/* Quick-Fill Testing Accounts */}
-            <div className="mt-6 pt-5 border-t border-slate-100">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                  <KeyRound className="h-3 w-3 text-[#690BA8]" />
-                  <span>Phase 2 Demo Credentials</span>
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono">Livexpert@2026</span>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-                <button
-                  type="button"
-                  onClick={() => quickFill("admin@livexpert.in")}
-                  className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-[#F5EFFB] hover:text-[#690BA8] text-left transition-colors font-medium truncate"
-                >
-                  Admin (Software/IT)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => quickFill("pm@livexpert.in")}
-                  className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-[#F5EFFB] hover:text-[#690BA8] text-left transition-colors font-medium truncate"
-                >
-                  PM (Product/Design)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => quickFill("lead@livexpert.in")}
-                  className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-[#F5EFFB] hover:text-[#690BA8] text-left transition-colors font-medium truncate"
-                >
-                  Lead (Software/IT)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => quickFill("dev@livexpert.in")}
-                  className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-[#F5EFFB] hover:text-[#690BA8] text-left transition-colors font-medium truncate"
-                >
-                  Dev (Software/IT)
-                </button>
-              </div>
-              <div className="mt-1.5 text-center">
-                <button
-                  type="button"
-                  onClick={() => quickFill("inactive@livexpert.in")}
-                  className="text-[10px] text-rose-500 hover:underline"
-                >
-                  Test Deactivated Account: inactive@livexpert.in
-                </button>
-              </div>
-            </div>
           </CardContent>
         </Card>
 
@@ -339,21 +303,6 @@ export const LoginPage: React.FC = () => {
             <p className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
               {forgotMessage}
             </p>
-            {forgotDebugToken && (
-              <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-left space-y-2 mt-3">
-                <span className="text-[11px] font-bold text-[#690BA8] uppercase">
-                  Development Reset Link:
-                </span>
-                <Link
-                  to={`/reset-password?token=${forgotDebugToken}&email=${encodeURIComponent(forgotEmail)}`}
-                  className="text-xs font-semibold text-[#690BA8] hover:underline flex items-center gap-1 break-all"
-                  onClick={() => setIsForgotModalOpen(false)}
-                >
-                  <span>Click here to set new password</span>
-                  <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                </Link>
-              </div>
-            )}
             <div className="pt-2">
               <Button
                 variant="outline"
@@ -367,7 +316,7 @@ export const LoginPage: React.FC = () => {
         ) : (
           <form onSubmit={handleForgotSubmit} className="space-y-4">
             <p className="text-xs text-slate-600 leading-relaxed">
-              Enter your registered Livexpert email address. A time-limited password reset link will be dispatched through your organization email provider.
+              Reset your password with the current code from the super admin’s Google Authenticator. No email link is used.
             </p>
             <Input
               label="Work Email"
@@ -378,6 +327,8 @@ export const LoginPage: React.FC = () => {
               onChange={(e) => setForgotEmail(e.target.value)}
               leftIcon={<Mail className="h-4 w-4" />}
             />
+            <Input label="Google Authenticator code" inputMode="numeric" maxLength={6} value={forgotCode} onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, "").slice(0, 6))} leftIcon={<ShieldCheck className="h-4 w-4" />} />
+            <Input label="New password" type="password" value={forgotNewPassword} onChange={(e) => setForgotNewPassword(e.target.value)} leftIcon={<Lock className="h-4 w-4" />} />
             <div className="flex justify-end gap-2 pt-2">
               <Button
                 type="button"
@@ -392,9 +343,9 @@ export const LoginPage: React.FC = () => {
                 variant="primary"
                 size="sm"
                 isLoading={forgotLoading}
-                disabled={!forgotEmail}
+                disabled={!forgotEmail || !/^\d{6}$/.test(forgotCode) || forgotNewPassword.length < 8}
               >
-                Send Reset Link
+                Reset Password
               </Button>
             </div>
           </form>

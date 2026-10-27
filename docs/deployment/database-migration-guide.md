@@ -146,7 +146,7 @@ npx prisma migrate resolve --rolled-back "20261025030000_phase7_notifications_au
 Roll back the Node.js application container or Git release to the previous known good commit:
 ```bash
 # Docker Compose
-docker compose -f docker-compose.prod.yml up -d --build backend
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build backend
 
 # PM2
 pm2 restart kibo360-backend

@@ -9,12 +9,14 @@ import {
   addComment,
   deleteComment,
   addAttachment,
+  downloadAttachment,
   deleteAttachment,
   addDependency,
   removeDependency,
 } from "../controllers/task.controller";
 import { authenticate } from "../middleware/auth";
 import { validateRequest } from "../middleware/validateRequest";
+import { taskFileUpload } from "../middleware/upload";
 import {
   createTaskSchema,
   updateTaskSchema,
@@ -44,7 +46,8 @@ router.post("/:id/comments", validateRequest(addCommentSchema), addComment);
 router.delete("/:id/comments/:commentId", deleteComment);
 
 // Attachments
-router.post("/:id/attachments", validateRequest(addAttachmentSchema), addAttachment);
+router.post("/:id/attachments", taskFileUpload.single("file"), validateRequest(addAttachmentSchema), addAttachment);
+router.get("/:id/attachments/:attachmentId/download", downloadAttachment);
 router.delete("/:id/attachments/:attachmentId", deleteAttachment);
 
 // Dependencies

@@ -167,13 +167,11 @@ certbot renew --post-hook "docker exec kibo360-nginx nginx -s reload"
    curl https://kibo360.livexpert.in/api/health
    ```
    Ensure `"scheduler": { "running": true }`.
-2. **Inspect Scheduler & SMTP Logs**:
+2. **Inspect Scheduler Logs**:
    Filter backend logs for scheduler tags:
    ```bash
-   docker logs kibo360-backend | grep -iE "scheduler|email|smtp"
+   docker logs kibo360-backend | grep -i "scheduler"
    ```
-3. **Verify SMTP Relay Authentication**:
-   Confirm credentials in `.env.production` (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`).
 
 ---
 
@@ -197,7 +195,7 @@ graph TD
 ### 5.1 Step-by-Step Upgrade Steps
 1. **Deploy to Staging First**:
    ```bash
-   docker compose -f docker-compose.staging.yml up -d --build
+   docker compose --env-file .env.staging -f docker-compose.staging.yml up -d --build
    npx tsx deployment/scripts/verify-staging.ts
    ```
 2. **Take Pre-Deployment Production Snapshot**:
@@ -209,11 +207,12 @@ graph TD
    ```
 3. **Run Production Database Migration**:
    ```bash
-   docker exec -it kibo360-backend npx prisma migrate deploy
+   docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build backend-migrate
    ```
+   This completes the one-shot migration service before the API restart.
 4. **Deploy Updated Production Containers**:
    ```bash
-   docker compose -f docker-compose.prod.yml up -d --no-deps --build backend frontend
+   docker compose --env-file .env.production -f docker-compose.prod.yml up -d --no-deps --build backend frontend
    ```
 5. **Run Production Smoke Tests**:
    Execute the automated launch checks suite:
