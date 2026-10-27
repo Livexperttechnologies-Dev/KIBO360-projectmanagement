@@ -87,27 +87,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const request = (async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-          method: "POST",
-          credentials: "include",
-        });
-        const json = await response.json().catch(() => null);
-        if (!response.ok) {
-          if (response.status === 401 || response.status === 403) {
-            localStorage.removeItem(TOKEN_KEY);
-            setUser(null);
-            setToken(null);
+        // Refresh tokens rotate on every request. Serialize refreshes across
+        // browser tabs so a second tab cannot reuse the token just revoked by
+        // the first tab and mistakenly clear the shared local session.
+        const performRefresh = async () => {
+          const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+            method: "POST",
+            credentials: "include",
+          });
+          const json = await response.json().catch(() => null);
+          if (!response.ok) {
+            if (response.status === 401 || response.status === 403) {
+              localStorage.removeItem(TOKEN_KEY);
+              setUser(null);
+              setToken(null);
+            }
+            return false;
           }
-          return false;
-        }
 
-        const nextToken = json?.data?.accessToken;
-        const nextUser = json?.data?.user;
-        if (typeof nextToken !== "string" || !nextUser) return false;
-        localStorage.setItem(TOKEN_KEY, nextToken);
-        setToken(nextToken);
-        setUser(nextUser);
-        return true;
+          const nextToken = json?.data?.accessToken;
+          const nextUser = json?.data?.user;
+          if (typeof nextToken !== "string" || !nextUser) return false;
+          localStorage.setItem(TOKEN_KEY, nextToken);
+          setToken(nextToken);
+          setUser(nextUser);
+          return true;
+        };
+
+        if (navigator.locks) {
+          return await navigator.locks.request("kibo360-auth-refresh", performRefresh);
+        }
+        return await performRefresh();
       } catch {
         return false;
       } finally {
