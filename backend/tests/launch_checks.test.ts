@@ -57,7 +57,7 @@ describe("Phase 10 — Production Launch Checks Suite", () => {
     assert.equal(loginRes.status, 200);
     const loginData = (await loginRes.json()) as any;
     assert.ok(loginData.data.accessToken, "Login must return access token");
-    assert.equal(loginData.data.user.role, "PROJECT_MANAGER");
+    assert.equal(loginData.data.user.role, "MANAGER");
 
     // 1b. Test logout
     const logoutRes = await fetch(`${BASE_URL}/auth/logout`, {

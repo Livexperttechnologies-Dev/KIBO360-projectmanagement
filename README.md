@@ -60,7 +60,7 @@
 
 ### Approved Roles
 - **Administrator**: Administrative control, account activation/deactivation, and audit trail access. The designated super admin creates users and assigns roles.
-- **Project Manager**: Access to project planning, team tasks, workload tracking, and user directory.
+- **Manager**: Access to project planning, team tasks, workload tracking, and user directory.
 - **Team Lead**: Sprint milestone coordination, technical deliverables, and department task allocation.
 - **Employee**: Individual task view, completion tracking, personal dashboard, and profile management.
 

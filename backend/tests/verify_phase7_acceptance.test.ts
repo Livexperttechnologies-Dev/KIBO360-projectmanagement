@@ -39,7 +39,7 @@ describe("Phase 7 — Notifications & Workflow Automation Acceptance Test Suite"
     assert.equal(leadRes.status, 200);
     leadToken = leadData.data.accessToken;
 
-    // 4. Authenticate Project Manager
+    // 4. Authenticate Manager
     const pmRes = await fetch(`${BASE_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

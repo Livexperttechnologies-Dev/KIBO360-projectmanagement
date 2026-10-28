@@ -65,7 +65,7 @@ export const ReportsPage: React.FC = () => {
   const [exportMenuOpen, setExportMenuOpen] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const canExport = user?.role === "ADMINISTRATOR" || user?.role === "PROJECT_MANAGER" || user?.role === "TEAM_LEAD";
+  const canExport = user?.role === "ADMINISTRATOR" || user?.role === "MANAGER" || user?.role === "TEAM_LEAD";
 
   useEffect(() => {
     if (token) {

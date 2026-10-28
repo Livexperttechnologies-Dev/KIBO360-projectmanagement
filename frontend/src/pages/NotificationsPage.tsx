@@ -51,7 +51,7 @@ export const NotificationsPage: React.FC = () => {
   const [workerRunning, setWorkerRunning] = useState<boolean>(false);
   const [workerMessage, setWorkerMessage] = useState<string | null>(null);
 
-  const canViewJobs = user?.role === "ADMINISTRATOR" || user?.role === "PROJECT_MANAGER" || user?.role === "TEAM_LEAD";
+  const canViewJobs = user?.role === "ADMINISTRATOR" || user?.role === "MANAGER" || user?.role === "TEAM_LEAD";
 
   useEffect(() => {
     if (token) {

@@ -15,7 +15,7 @@ describe("Phase 5 — Task and Subtask Management Suite", () => {
   const pmUser: TokenPayload = {
     userId: "usr-pm-02",
     email: "pm@livexpert.in",
-    role: "PROJECT_MANAGER",
+    role: "MANAGER",
     departmentId: "dept-pd",
   };
 

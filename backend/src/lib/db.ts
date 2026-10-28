@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 
-export type Role = "ADMINISTRATOR" | "PROJECT_MANAGER" | "TEAM_LEAD" | "EMPLOYEE";
+export type Role = "ADMINISTRATOR" | "MANAGER" | "TEAM_LEAD" | "EMPLOYEE";
 export type ProjectStatus = "PLANNING" | "ACTIVE" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";
 export type TaskStatus =
   | "OPEN"
@@ -322,7 +322,7 @@ class HubDatabaseStore {
       id: "usr-pm-02",
       email: "pm@livexpert.in",
       passwordHash: defaultPasswordHash,
-      role: "PROJECT_MANAGER",
+      role: "MANAGER",
       isActive: true,
       isInvited: false,
       departmentId: pdDept.id,

@@ -107,7 +107,7 @@ export const ProjectsPage: React.FC = () => {
   const [memberSubmitting, setMemberSubmitting] = useState<boolean>(false);
 
   // Check if current user can create projects
-  const canCreateProject = user?.role === "ADMINISTRATOR" || user?.role === "PROJECT_MANAGER";
+  const canCreateProject = user?.role === "ADMINISTRATOR" || user?.role === "MANAGER";
 
   // Load project filters reference options
   useEffect(() => {

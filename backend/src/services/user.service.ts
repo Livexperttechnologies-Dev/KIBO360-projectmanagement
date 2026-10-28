@@ -78,7 +78,7 @@ export class UserService {
   public static listUsers(filters?: { departmentId?: string; role?: string; search?: string }, requester?: { role: Role; departmentId?: string }) {
     let users = dbStore.users;
 
-    if (requester && requester.role !== "ADMINISTRATOR" && requester.role !== "PROJECT_MANAGER") {
+    if (requester && requester.role !== "ADMINISTRATOR" && requester.role !== "MANAGER") {
       users = users.filter((u) => Boolean(requester.departmentId) && u.departmentId === requester.departmentId);
     } else if (filters?.departmentId) {
       users = users.filter((u) => u.departmentId === filters.departmentId);

@@ -130,7 +130,7 @@ describe("Phase 2 â€” Authentication and User Management Suite", () => {
     assert.equal(adminUser.role, "ADMINISTRATOR");
     assert.equal(employeeUser.role, "EMPLOYEE");
 
-    const allowedRoles = ["ADMINISTRATOR", "PROJECT_MANAGER"];
+    const allowedRoles = ["ADMINISTRATOR", "MANAGER"];
     assert.ok(allowedRoles.includes(adminUser.role), "Administrator must have access");
     assert.equal(allowedRoles.includes(employeeUser.role), false, "Employee must be rejected from admin routes");
   });
@@ -183,8 +183,8 @@ describe("Phase 2 â€” Authentication and User Management Suite", () => {
     assert.equal(deptUpdate.department?.name, "Product / Design");
 
     // Update role
-    const roleUpdate = await UserService.updateUserRole(createRes.user.id, "PROJECT_MANAGER");
-    assert.equal(roleUpdate.role, "PROJECT_MANAGER");
+    const roleUpdate = await UserService.updateUserRole(createRes.user.id, "MANAGER");
+    assert.equal(roleUpdate.role, "MANAGER");
   });
 
   // 9. Audit Logging

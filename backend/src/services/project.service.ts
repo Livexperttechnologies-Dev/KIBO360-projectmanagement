@@ -24,7 +24,7 @@ export class ProjectService {
    * Helper to check if current user can view a project
    */
   public static canViewProject(project: ProjectRecord, user: TokenPayload): boolean {
-    if (user.role === "ADMINISTRATOR" || user.role === "PROJECT_MANAGER") {
+    if (user.role === "ADMINISTRATOR" || user.role === "MANAGER") {
       return true;
     }
 
@@ -51,7 +51,7 @@ export class ProjectService {
       return true;
     }
 
-    if (user.role === "PROJECT_MANAGER") {
+    if (user.role === "MANAGER") {
       // PMs can edit projects in their department or projects they own/created
       if (!project.departmentId || project.departmentId === user.departmentId) return true;
       if (project.ownerId === user.userId || project.creatorId === user.userId) return true;
@@ -269,7 +269,7 @@ export class ProjectService {
    * Create a new project (Authorized Managers only)
    */
   public static async createProject(data: any, user: TokenPayload) {
-    if (user.role !== "ADMINISTRATOR" && user.role !== "PROJECT_MANAGER") {
+    if (user.role !== "ADMINISTRATOR" && user.role !== "MANAGER") {
       const err: any = new Error("Only authorized managers can create projects");
       err.status = 403;
       throw err;

@@ -1,6 +1,6 @@
 # KIBO360 Project Hub — End User Guide
 
-User manual for **Livexpert Technologies Pvt. Ltd.** employees, team leads, and project managers.
+User manual for **Livexpert Technologies Pvt. Ltd.** employees, team leads, and managers.
 
 ---
 

@@ -454,7 +454,7 @@ export const CalendarPage: React.FC = () => {
         </select>
 
         {/* Department Selector (Managers / Admins) */}
-        {(user?.role === "ADMINISTRATOR" || user?.role === "PROJECT_MANAGER") && (
+        {(user?.role === "ADMINISTRATOR" || user?.role === "MANAGER") && (
           <select
             value={selectedDepartment}
             onChange={(e) => setSelectedDepartment(e.target.value)}

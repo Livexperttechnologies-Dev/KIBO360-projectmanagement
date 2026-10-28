@@ -32,8 +32,8 @@ router.get("/departments", authenticate, listDepartments);
 // Audit logs (Administrator only)
 router.get("/audit-logs", authenticate, requireRole("ADMINISTRATOR"), listAuditLogs);
 
-// User directory (Administrator and Project Manager)
-router.get("/", authenticate, requireRole("ADMINISTRATOR", "PROJECT_MANAGER", "TEAM_LEAD", "EMPLOYEE"), listUsers);
+// User directory (Administrator and Manager)
+router.get("/", authenticate, requireRole("ADMINISTRATOR", "MANAGER", "TEAM_LEAD", "EMPLOYEE"), listUsers);
 
 // Specific user
 router.get("/:id", authenticate, getUserById);

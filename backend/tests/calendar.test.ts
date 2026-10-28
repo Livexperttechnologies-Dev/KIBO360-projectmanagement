@@ -31,7 +31,7 @@ describe("Phase 6 — Deadline and Calendar Management Suite", () => {
     assert.equal(devRes.status, 200);
     devToken = devData.data.accessToken;
 
-    // 3. Authenticate Project Manager (Product / Design PM)
+    // 3. Authenticate Manager (Product / Design)
     const pmRes = await fetch(`${BASE_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

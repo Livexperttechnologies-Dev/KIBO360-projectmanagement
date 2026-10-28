@@ -171,7 +171,7 @@ npx prisma db seed --schema=backend/prisma/schema.prisma
 ```
 Default accounts seeded:
 - `admin@livexpert.in` (`ADMINISTRATOR`)
-- `pm@livexpert.in` (`PROJECT_MANAGER`)
+- `pm@livexpert.in` (`MANAGER`)
 - `lead@livexpert.in` (`TEAM_LEAD`)
 - `dev@livexpert.in` (`EMPLOYEE`)
 All accounts are provisioned with initial temporary password: `Livexpert@2026` (which requires immediate rotation).

@@ -316,7 +316,7 @@ export class DashboardService {
     const tasks = this.filterTasks(filters, user).filter(
       (t) =>
         (t.status === "IN_REVIEW" || t.status === "UNDER_REVIEW") &&
-        (user.role === "ADMINISTRATOR" || user.role === "PROJECT_MANAGER" || t.reviewerId === user.userId)
+        (user.role === "ADMINISTRATOR" || user.role === "MANAGER" || t.reviewerId === user.userId)
     );
 
     return tasks.map((t) => {

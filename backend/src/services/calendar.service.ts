@@ -80,7 +80,7 @@ export class CalendarService {
    * Check whether user has permission to see the project
    */
   private static canViewProject(project: ProjectRecord, user: TokenPayload): boolean {
-    if (user.role === "ADMINISTRATOR" || user.role === "PROJECT_MANAGER") {
+    if (user.role === "ADMINISTRATOR" || user.role === "MANAGER") {
       return true;
     }
 

@@ -78,7 +78,7 @@ export class TaskService {
     const project = dbStore.getProjectById(task.projectId);
     if (!project) return false;
 
-    if (user.role === "PROJECT_MANAGER") {
+    if (user.role === "MANAGER") {
       if (project.departmentId && project.departmentId === user.departmentId) return true;
       if (project.ownerId === user.userId || project.creatorId === user.userId) return true;
     }
@@ -481,9 +481,9 @@ export class TaskService {
     const reviewStatus = task.status === "IN_REVIEW" || task.status === "UNDER_REVIEW";
     const isReviewDecision = reviewStatus && (updates.status === "COMPLETED" || updates.status === "CHANGES_REQUIRED");
     const canDecideReview =
-      user.role === "ADMINISTRATOR" || user.role === "PROJECT_MANAGER" || task.reviewerId === user.userId;
+      user.role === "ADMINISTRATOR" || user.role === "MANAGER" || task.reviewerId === user.userId;
     if (isReviewDecision && !canDecideReview) {
-      const error: any = new Error("Only an administrator, project manager, or the assigned reviewer can decide a task review");
+      const error: any = new Error("Only an administrator, manager, or the assigned reviewer can decide a task review");
       error.statusCode = 403;
       throw error;
     }
@@ -491,7 +491,7 @@ export class TaskService {
     // Permission check
     const reviewerStatusOnly =
       isReviewDecision &&
-      (task.reviewerId === user.userId || user.role === "PROJECT_MANAGER") &&
+      (task.reviewerId === user.userId || user.role === "MANAGER") &&
       Object.keys(updates).every((field) => field === "status" || field === "completionPercentage");
     const permission = reviewerStatusOnly
       ? { allowed: true }
@@ -804,7 +804,7 @@ export class TaskService {
     if (
       comment.userId !== user.userId &&
       user.role !== "ADMINISTRATOR" &&
-      user.role !== "PROJECT_MANAGER"
+      user.role !== "MANAGER"
     ) {
       const error: any = new Error("Forbidden: You can only delete your own comments");
       error.statusCode = 403;
@@ -883,7 +883,7 @@ export class TaskService {
     if (
       attachment.uploaderId !== user.userId &&
       user.role !== "ADMINISTRATOR" &&
-      user.role !== "PROJECT_MANAGER"
+      user.role !== "MANAGER"
     ) {
       const error: any = new Error("Forbidden: You can only delete your own attachments");
       error.statusCode = 403;

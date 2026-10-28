@@ -15,7 +15,7 @@ describe("Phase 4 — Enterprise Project Management Suite", () => {
   const pmUser: TokenPayload = {
     userId: "usr-pm-02",
     email: "pm@livexpert.in",
-    role: "PROJECT_MANAGER",
+    role: "MANAGER",
     departmentId: "dept-pd",
   };
 
@@ -57,7 +57,7 @@ describe("Phase 4 — Enterprise Project Management Suite", () => {
     assert.ok(persisted, "Project must be persisted in database store");
     assert.equal(persisted.key, "CTG");
 
-    // Project Manager can create
+    // Manager can create
     const pmPayload = {
       title: "Design System Mobile Kit",
       key: "DSMK",

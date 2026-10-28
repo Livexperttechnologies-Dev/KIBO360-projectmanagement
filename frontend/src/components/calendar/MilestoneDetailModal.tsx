@@ -29,7 +29,7 @@ export const MilestoneDetailModal: React.FC<MilestoneDetailModalProps> = ({
   const isReached = event.status === "REACHED";
   const canManage =
     user?.role === "ADMINISTRATOR" ||
-    user?.role === "PROJECT_MANAGER" ||
+    user?.role === "MANAGER" ||
     user?.role === "TEAM_LEAD";
 
   const handleToggleReached = async () => {

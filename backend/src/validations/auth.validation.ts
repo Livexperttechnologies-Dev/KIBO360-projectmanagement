@@ -23,7 +23,7 @@ export const createUserSchema = z.object({
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
     password: z.string().min(8, "Password must be at least 8 characters"),
-    role: z.enum(["ADMINISTRATOR", "PROJECT_MANAGER", "TEAM_LEAD", "EMPLOYEE"]),
+    role: z.enum(["ADMINISTRATOR", "MANAGER", "TEAM_LEAD", "EMPLOYEE"]),
     departmentId: z.string().min(1, "Department assignment is required"),
     jobTitle: z.string().optional(),
   }),
@@ -66,6 +66,6 @@ export const assignDepartmentSchema = z.object({
 
 export const updateUserRoleSchema = z.object({
   body: z.object({
-    role: z.enum(["ADMINISTRATOR", "PROJECT_MANAGER", "TEAM_LEAD", "EMPLOYEE"]),
+    role: z.enum(["ADMINISTRATOR", "MANAGER", "TEAM_LEAD", "EMPLOYEE"]),
   }),
 });

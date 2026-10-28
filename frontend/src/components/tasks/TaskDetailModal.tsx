@@ -384,7 +384,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 <option value="BLOCKED">Blocked</option>
               </select>
 
-              {(user?.role === "ADMINISTRATOR" || user?.role === "PROJECT_MANAGER") && (
+              {(user?.role === "ADMINISTRATOR" || user?.role === "MANAGER") && (
                 <button
                   onClick={handleDeleteTask}
                   className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"

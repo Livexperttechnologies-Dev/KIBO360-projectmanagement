@@ -12,7 +12,7 @@ datasource db {
 
 enum Role {
   ADMINISTRATOR
-  PROJECT_MANAGER
+  MANAGER
   TEAM_LEAD
   EMPLOYEE
 }

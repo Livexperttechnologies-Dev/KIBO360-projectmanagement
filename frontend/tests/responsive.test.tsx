@@ -8,7 +8,7 @@ import { AuthContext } from "../src/contexts/AuthContext";
 
 describe("Frontend Responsive Layout Suite", () => {
   const mockAuth: any = {
-    user: { id: "usr-01", email: "pm@livexpert.in", role: "PROJECT_MANAGER", name: "Project Manager" },
+    user: { id: "usr-01", email: "pm@livexpert.in", role: "MANAGER", name: "Manager" },
     token: "mock-token",
     login: async () => {},
     logout: async () => {},

@@ -468,7 +468,7 @@ export const UserManagementPage: React.FC = () => {
                             variant={
                               u.role === "ADMINISTRATOR"
                                 ? "coral"
-                                : u.role === "PROJECT_MANAGER"
+                                : u.role === "MANAGER"
                                 ? "magenta"
                                 : u.role === "TEAM_LEAD"
                                 ? "primary"
@@ -629,7 +629,7 @@ export const UserManagementPage: React.FC = () => {
             >
               <option value="EMPLOYEE">Employee</option>
               <option value="TEAM_LEAD">Team Lead</option>
-              <option value="PROJECT_MANAGER">Project Manager</option>
+              <option value="MANAGER">Manager</option>
               <option value="ADMINISTRATOR">Administrator</option>
             </select>
           </div>
@@ -687,7 +687,7 @@ export const UserManagementPage: React.FC = () => {
                 className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-800 focus:border-[#690BA8] focus:outline-none"
               >
                 <option value="ADMINISTRATOR">Administrator</option>
-                <option value="PROJECT_MANAGER">Project Manager</option>
+                <option value="MANAGER">Manager</option>
                 <option value="TEAM_LEAD">Team Lead</option>
                 <option value="EMPLOYEE">Employee</option>
               </select>

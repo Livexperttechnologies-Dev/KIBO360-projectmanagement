@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import { API_BASE_URL } from "../api/client";
 
-export type Role = "ADMINISTRATOR" | "PROJECT_MANAGER" | "TEAM_LEAD" | "EMPLOYEE";
+export type Role = "ADMINISTRATOR" | "MANAGER" | "TEAM_LEAD" | "EMPLOYEE";
 
 export interface UserProfile {
   id: string;

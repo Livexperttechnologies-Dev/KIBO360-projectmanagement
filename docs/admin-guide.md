@@ -11,7 +11,7 @@ KIBO360 implements strict hierarchical role boundaries across all API endpoints 
 | Role | Hierarchy Level | Capabilities & Access Scope |
 | :--- | :---: | :--- |
 | **`ADMINISTRATOR`** | Level 4 (Highest) | Complete enterprise control. Manages users, departments, roles, audits, project creation, server worker cycles, and system configurations. |
-| **`PROJECT_MANAGER`** | Level 3 | Creates projects, creates milestones, assigns team leads, views enterprise-wide KPIs, exports corporate CSV reports. Cannot alter user accounts or roles. |
+| **`MANAGER`** | Level 3 | Creates projects, creates milestones, assigns team leads, views enterprise-wide KPIs, exports corporate CSV reports. Cannot alter user accounts or roles. |
 | **`TEAM_LEAD`** | Level 2 | Manages tasks and team members within their assigned department or project. Reviews deliverables and requests changes. Exports departmental CSV reports. |
 | **`EMPLOYEE`** | Level 1 | Creates tasks, logs progress, updates subtasks, posts comments, and uploads attachments within their department. Scoped strictly to assigned department projects. |
 
@@ -27,7 +27,7 @@ Only the designated super admin can create accounts. Click **Create User** in Us
    - **Email Address** (`@livexpert.in`)
    - **Initial Password**
    - **Assigned Department**: Select `Software / IT` or `Product / Design`.
-   - **System Role**: Select `EMPLOYEE`, `TEAM_LEAD`, or `PROJECT_MANAGER`.
+   - **System Role**: Select `EMPLOYEE`, `TEAM_LEAD`, or `MANAGER`.
    - **Job Title**: E.g., `Senior Backend Engineer`, `UI/UX Designer`.
 Click **Create User**. The account is active immediately and can sign in with the password set by the super admin. No invitation email is sent.
 
