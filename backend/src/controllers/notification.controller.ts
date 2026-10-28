@@ -2,7 +2,12 @@ import { Request, Response } from "express";
 import { notificationService } from "../services/notification.service";
 import { jobQueueService } from "../services/job-queue.service";
 import { schedulerService } from "../services/scheduler.service";
-import { NotificationType } from "../lib/db";
+import { NotificationType, Role } from "../lib/db";
+import { persistStore } from "../lib/persistence";
+import { isDesignatedSuperAdmin } from "../lib/superAdmin";
+
+const canManageAllNotifications = (user: { userId: string; role: Role }): boolean =>
+  user.role === "MANAGER" || isDesignatedSuperAdmin(user.userId, user.role);
 
 export class NotificationController {
   /**
@@ -27,8 +32,18 @@ export class NotificationController {
         filters.entityType = entityTypeParam;
       }
 
-      const notifications = notificationService.getNotifications(user.userId, filters);
-      const unreadCount = notificationService.getUnreadCount(user.userId);
+      const canViewAllUsers = canManageAllNotifications(user);
+      const backfilledCount = canViewAllUsers
+        ? notificationService.ensureAllUsersAssignedTaskNotifications()
+        : notificationService.ensureAssignedTaskNotifications(user.userId);
+      if (backfilledCount > 0) await persistStore();
+
+      const notifications = canViewAllUsers
+        ? notificationService.getAllNotifications(filters)
+        : notificationService.getNotifications(user.userId, filters);
+      const unreadCount = canViewAllUsers
+        ? notificationService.getAllUnreadCount()
+        : notificationService.getUnreadCount(user.userId);
 
       res.status(200).json({
         success: true,
@@ -52,7 +67,10 @@ export class NotificationController {
   public static async getUnreadCount(req: Request, res: Response): Promise<void> {
     try {
       const user = (req as any).user;
-      const unreadCount = notificationService.getUnreadCount(user.userId);
+      const canViewAllUsers = canManageAllNotifications(user);
+      const unreadCount = canViewAllUsers
+        ? notificationService.getAllUnreadCount()
+        : notificationService.getUnreadCount(user.userId);
       res.status(200).json({
         success: true,
         data: { unreadCount },
@@ -73,7 +91,10 @@ export class NotificationController {
       const user = (req as any).user;
       const id = req.params.id as string;
 
-      const updated = notificationService.markAsRead(id, user.userId);
+      const canManageAll = canManageAllNotifications(user);
+      const updated = canManageAll
+        ? notificationService.markAnyAsRead(id)
+        : notificationService.markAsRead(id, user.userId);
       if (!updated) {
         res.status(404).json({
           success: false,
@@ -101,7 +122,10 @@ export class NotificationController {
   public static async markAllAsRead(req: Request, res: Response): Promise<void> {
     try {
       const user = (req as any).user;
-      const updatedCount = notificationService.markAllAsRead(user.userId);
+      const canManageAll = canManageAllNotifications(user);
+      const updatedCount = canManageAll
+        ? notificationService.markAllUsersAsRead()
+        : notificationService.markAllAsRead(user.userId);
 
       res.status(200).json({
         success: true,
@@ -124,7 +148,10 @@ export class NotificationController {
       const user = (req as any).user;
       const id = req.params.id as string;
 
-      const deleted = notificationService.deleteNotification(id, user.userId);
+      const canManageAll = canManageAllNotifications(user);
+      const deleted = canManageAll
+        ? notificationService.deleteAnyNotification(id)
+        : notificationService.deleteNotification(id, user.userId);
       if (!deleted) {
         res.status(404).json({
           success: false,

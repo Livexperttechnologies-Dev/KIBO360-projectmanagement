@@ -76,7 +76,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ summary, isLoading }
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
         {Array.from({ length: 6 }).map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardContent className="p-4 space-y-3">
@@ -91,37 +91,35 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ summary, isLoading }
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
       {cards.map((card) => {
         const Icon = card.icon;
         return (
           <Card
             key={card.title}
-            className={`border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card ${card.borderColor} ${
-              card.isAlert ? "bg-orange-50/20" : "bg-white"
+            className={`relative overflow-hidden border border-violet-100 bg-gradient-to-br from-white to-[#FBF7FF] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+              card.isAlert ? "!border-rose-200 !from-rose-50/70 !to-white" : ""
             }`}
           >
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
+            <CardContent className="relative p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-[11px] font-semibold text-slate-500 truncate">
+                    {card.title}
+                  </div>
+                  <div className={`mt-2 text-3xl font-extrabold tracking-tight ${card.isAlert ? "text-[#F16A65]" : "text-slate-950"}`}>
+                    {card.value}
+                  </div>
+                </div>
                 <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${card.bg} ${card.color}`}>
                   <Icon className="h-5 w-5" />
                 </div>
-                {card.isAlert && (
-                  <span className="flex h-2 w-2 rounded-full bg-[#F16A65] animate-ping" />
-                )}
               </div>
-              <div className="mt-3">
-                <div className={`text-2xl font-black tracking-tight ${card.isAlert ? "text-[#F16A65]" : "text-slate-900"}`}>
-                  {card.value}
-                </div>
-                <div className="text-xs font-bold text-slate-700 mt-0.5 truncate">
-                  {card.title}
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5 truncate">
-                  {card.subtext}
-                </div>
+              <div className="mt-2 truncate text-[10px] font-medium text-slate-500">
+                {card.subtext}
               </div>
             </CardContent>
+            <div className={`absolute inset-x-0 bottom-0 h-0.5 ${card.isAlert ? "bg-rose-400" : "bg-gradient-to-r from-[#690BA8]/70 via-[#B52BC2]/35 to-transparent"}`} />
           </Card>
         );
       })}

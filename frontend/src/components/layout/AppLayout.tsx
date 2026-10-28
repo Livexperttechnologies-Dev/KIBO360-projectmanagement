@@ -7,7 +7,7 @@ export const AppLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F8F9FC]">
+    <div className="flex h-screen overflow-hidden bg-[#FBF9FD]">
       {/* Sidebar Navigation */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 

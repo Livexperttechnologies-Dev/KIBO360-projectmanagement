@@ -54,9 +54,10 @@ export const NotificationsPage: React.FC = () => {
   const canViewJobs = user?.role === "ADMINISTRATOR" || user?.role === "MANAGER" || user?.role === "TEAM_LEAD";
 
   useEffect(() => {
-    if (token) {
-      loadNotifications();
-    }
+    if (!token) return;
+    void loadNotifications();
+    const refreshTimer = window.setInterval(() => void loadNotifications(), 15000);
+    return () => window.clearInterval(refreshTimer);
   }, [token, activeTab]);
 
   const loadNotifications = async () => {

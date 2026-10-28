@@ -541,6 +541,18 @@ export const CalendarPage: React.FC = () => {
         />
       )}
 
+      {!loading && !error && events.length === 0 && (
+        <div
+          className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-4 text-center"
+          role="status"
+        >
+          <p className="text-sm font-semibold text-slate-700">No scheduled tasks or milestones in this period.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Calendar items appear on their due dates. Try another date range or clear the filters.
+          </p>
+        </div>
+      )}
+
       {/* Task Details Modal */}
       <TaskDetailModal
         taskId={selectedTaskId}

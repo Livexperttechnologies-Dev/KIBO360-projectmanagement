@@ -23,8 +23,8 @@ export const ReviewQueue: React.FC<ReviewQueueProps> = ({ tasks = [], onApprove 
   };
 
   return (
-    <Card className="h-full">
-      <CardHeader>
+    <Card className="h-full border-violet-100 shadow-sm hover:shadow-md">
+      <CardHeader className="border-violet-100/80">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Eye className="h-4 w-4 text-amber-500" />

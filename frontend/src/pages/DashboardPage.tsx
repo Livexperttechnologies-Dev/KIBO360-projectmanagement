@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import {
   FolderKanban,
   RefreshCw,
-  Sparkles,
   ArrowUpRight,
   AlertCircle,
   Building2,
@@ -85,19 +84,18 @@ export const DashboardPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 pb-2">
       {/* Welcome & Context Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 rounded-2xl border border-violet-100 bg-gradient-to-r from-white via-white to-[#F8F0FF] px-5 py-5 shadow-sm sm:px-6">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-[#690BA8] mb-2 border border-[#690BA8]/15">
-            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-            <span>KIBO360 Analytics Engine • Live PostgreSQL Data</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
-            Welcome back, {user?.profile?.firstName || "Team Member"}!
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#8A55AA]">
+            KIBO360 · Project overview
+          </p>
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-950">
+            Welcome back, <span className="bg-gradient-to-r from-[#690BA8] to-[#B52BC2] bg-clip-text text-transparent">{user?.profile?.firstName || "Team Member"}</span>
           </h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Real-time project telemetry, sprint workload, and delivery metrics for Livexpert Technologies.
+          <p className="text-sm text-slate-500 mt-1">
+            A clear view of project progress, team workload, and upcoming delivery dates.
           </p>
         </div>
 
@@ -109,7 +107,7 @@ export const DashboardPage: React.FC = () => {
             isLoading={isLoading}
             leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
           >
-            Refresh Metrics
+            Refresh overview
           </Button>
         </div>
       </div>
@@ -145,7 +143,7 @@ export const DashboardPage: React.FC = () => {
       )}
 
       {/* Row 1: Charts & Workload */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <StatusDistributionChart
           distribution={data?.statusStats?.distribution}
           totalTasks={data?.statusStats?.total ?? 0}
@@ -154,11 +152,11 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Row 2: Recent Projects Table & Upcoming Deadlines */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Recent Projects (2 cols on desktop) */}
         <div className="lg:col-span-2">
-          <Card className="h-full">
-            <CardHeader>
+          <Card className="h-full border-violet-100 shadow-sm">
+            <CardHeader className="border-violet-100/80">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Recent Projects</CardTitle>
@@ -185,7 +183,7 @@ export const DashboardPage: React.FC = () => {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                    <thead className="bg-[#FBF8FE] text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500 border-b border-violet-100/80">
                       <tr>
                         <th className="px-5 py-3">Project</th>
                         <th className="px-5 py-3">Department</th>
@@ -257,7 +255,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Row 3: My Assigned Tasks & Tasks Awaiting Review */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <MyAssignedTasks
           tasks={data?.myTasks}
           onToggleStatus={handleTaskStatusToggle}

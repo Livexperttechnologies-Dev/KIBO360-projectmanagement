@@ -83,6 +83,25 @@ export const MyTasksPage: React.FC = () => {
     return true;
   });
 
+  const emptyState = search.trim() && tasks.length > 0
+    ? {
+        title: "No tasks match your search.",
+        description: "Try another search term or clear the search field.",
+      }
+    : tasks.length === 0
+      ? {
+          title: "No tasks are assigned to you yet.",
+          description: "Tasks assigned to your account will appear here. Use Add Task to create a task and assign it to yourself.",
+        }
+      : {
+          title: `No ${activeTab} tasks to show.`,
+          description: activeTab === "active"
+            ? "Your assigned tasks are completed. Check the Completed or All tab to view them."
+            : activeTab === "completed"
+              ? "You have no completed tasks yet. Check the Active or All tab to view your other tasks."
+              : "No assigned tasks are available in this view.",
+        };
+
   const getPriorityBadgeVariant = (priority: string) => {
     switch (priority) {
       case "URGENT":
@@ -177,8 +196,9 @@ export const MyTasksPage: React.FC = () => {
           {loading ? (
             <div className="py-12 text-center text-xs text-slate-400">Loading your deliverables...</div>
           ) : filteredTasks.length === 0 ? (
-            <div className="py-12 text-center text-xs text-slate-400">
-              No tasks found under the "{activeTab}" view.
+            <div className="px-5 py-12 text-center" role="status">
+              <p className="text-sm font-semibold text-slate-700">{emptyState.title}</p>
+              <p className="mt-1 text-xs text-slate-500">{emptyState.description}</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">

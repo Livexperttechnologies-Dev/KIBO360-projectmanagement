@@ -9,11 +9,16 @@ export class NotificationService {
   /**
    * Check if a recipient is authorized to receive updates about a project
    */
-  public hasProjectAccess(userId: string, projectId?: string): boolean {
+  public hasProjectAccess(
+    userId: string,
+    projectId?: string,
+    entityType?: "TASK" | "MILESTONE" | "PROJECT",
+    entityId?: string,
+  ): boolean {
     if (!projectId) return true;
     const user = dbStore.findUserById(userId);
     if (!user) return false;
-    if (user.role === "ADMINISTRATOR") return true;
+    if (user.role === "ADMINISTRATOR" || user.role === "MANAGER") return true;
 
     const project = dbStore.getProjectById(projectId);
     if (!project) return false;
@@ -26,6 +31,18 @@ export class NotificationService {
       (m) => m.projectId === projectId && m.userId === userId
     );
     if (isMember) return true;
+
+    // Assignees, reviewers, and task creators are valid recipients even when
+    // they are not separately listed as project members.
+    if (entityType === "TASK" && entityId) {
+      const task = dbStore.getTaskById(entityId);
+      if (
+        task?.projectId === projectId &&
+        [task.assigneeId, task.reviewerId, task.creatorId].includes(userId)
+      ) {
+        return true;
+      }
+    }
 
     return false;
   }
@@ -72,9 +89,14 @@ export class NotificationService {
     entityId?: string;
     projectId?: string;
     dedupKey?: string;
+    skipProjectAccess?: boolean;
   }): NotificationRecord | null {
     // 1. Verify project permission before notifying
-    if (data.projectId && !this.hasProjectAccess(data.userId, data.projectId)) {
+    if (
+      data.projectId &&
+      !data.skipProjectAccess &&
+      !this.hasProjectAccess(data.userId, data.projectId, data.entityType, data.entityId)
+    ) {
       console.warn(
         `[NotificationService] Suppressed notification for user ${data.userId}: unauthorized for project ${data.projectId}`
       );
@@ -126,6 +148,8 @@ export class NotificationService {
       entityId: task.id,
       projectId: task.projectId,
       dedupKey: `ASSIGNMENT:${task.id}:${assigneeId}`,
+      // A direct task assignment itself authorizes notifying its assignee.
+      skipProjectAccess: true,
     });
   }
 
@@ -167,7 +191,8 @@ export class NotificationService {
         message: `Task "${task.title}" has been reassigned to another team member`,
         entityType: "TASK",
         entityId: task.id,
-        projectId: task.projectId,
+        // The task now belongs to the new assignee, so the old assignee's
+        // prior assignment is the authorization for this specific notice.
         dedupKey: `REASSIGNMENT_OLD:${task.id}:${oldAssigneeId}:${Date.now()}`,
       });
     }
@@ -335,20 +360,108 @@ export class NotificationService {
     return dbStore.getNotifications(userId, filters);
   }
 
+  public getAllNotifications(
+    filters?: { isRead?: boolean; type?: NotificationType; entityType?: string }
+  ): NotificationRecord[] {
+    return dbStore.notifications
+      .filter((notification) => {
+        if (filters?.isRead !== undefined && notification.isRead !== filters.isRead) return false;
+        if (filters?.type && notification.type !== filters.type) return false;
+        if (filters?.entityType && notification.entityType !== filters.entityType) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
   public getUnreadCount(userId: string): number {
     return dbStore.getUnreadNotificationCount(userId);
+  }
+
+  public getAllUnreadCount(): number {
+    return dbStore.notifications.filter((notification) => !notification.isRead).length;
+  }
+
+  public ensureAllUsersAssignedTaskNotifications(): number {
+    return dbStore.users.reduce(
+      (total, user) => total + this.ensureAssignedTaskNotifications(user.id),
+      0,
+    );
+  }
+
+  /** Add a one-time inbox notice for active tasks assigned before notifications
+   * were enabled or before the assignment notification fix was deployed. */
+  public ensureAssignedTaskNotifications(userId: string): number {
+    let created = 0;
+    const tasks = dbStore.tasks.filter(
+      (task) => task.assigneeId === userId && task.status !== "COMPLETED" && task.creatorId !== userId
+    );
+
+    for (const task of tasks) {
+      const alreadyNotified = dbStore.notifications.some(
+        (notification) =>
+          notification.userId === userId &&
+          notification.type === "NEW_TASK_ASSIGNMENT" &&
+          notification.entityId === task.id
+      );
+      if (alreadyNotified) continue;
+
+      const actor = task.creatorId ? dbStore.findUserById(task.creatorId) : undefined;
+      const actorName = actor ? actor.email.split("@")[0] : "A manager";
+      const notification = this.sendNotification({
+        userId,
+        type: "NEW_TASK_ASSIGNMENT",
+        title: "Task Assigned To You",
+        message: `${actorName} assigned you to task: "${task.title}"`,
+        entityType: "TASK",
+        entityId: task.id,
+        projectId: task.projectId,
+        dedupKey: `ASSIGNMENT:${task.id}:${userId}`,
+        skipProjectAccess: true,
+      });
+      if (notification) created++;
+    }
+
+    return created;
   }
 
   public markAsRead(id: string, userId: string): NotificationRecord | null {
     return dbStore.markNotificationAsRead(id, userId);
   }
 
+  public markAnyAsRead(id: string): NotificationRecord | null {
+    const notification = dbStore.notifications.find((item) => item.id === id);
+    if (!notification) return null;
+    notification.isRead = true;
+    notification.readAt = new Date();
+    return notification;
+  }
+
   public markAllAsRead(userId: string): number {
     return dbStore.markAllNotificationsAsRead(userId);
   }
 
+  public markAllUsersAsRead(): number {
+    let updatedCount = 0;
+    const now = new Date();
+    for (const notification of dbStore.notifications) {
+      if (!notification.isRead) {
+        notification.isRead = true;
+        notification.readAt = now;
+        updatedCount++;
+      }
+    }
+    return updatedCount;
+  }
+
   public deleteNotification(id: string, userId: string): boolean {
     return dbStore.deleteNotification(id, userId);
+  }
+
+  public deleteAnyNotification(id: string): boolean {
+    const index = dbStore.notifications.findIndex((notification) => notification.id === id);
+    if (index === -1) return false;
+    dbStore.notifications.splice(index, 1);
+    return true;
   }
 
   public getPreferences(userId: string): NotificationPreferenceRecord {
