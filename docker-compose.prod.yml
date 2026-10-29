@@ -80,6 +80,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 5000
+      # Migrations and admin bootstrap run in the one-shot services above
+      RUN_MIGRATIONS: "false"
+      TRUST_PROXY: ${TRUST_PROXY:-1}
       DATABASE_URL: postgresql://kibo360_app:${POSTGRES_APP_PASSWORD}@postgres:5432/${POSTGRES_DB:-kibo360_hub}?schema=public
       FRONTEND_URL: ${FRONTEND_URL:?Set the public application URL}
       CORS_ORIGIN: ${CORS_ORIGIN:?Set the allowed browser origin}
@@ -117,10 +120,10 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    environment:
+      API_UPSTREAM: http://backend:5000
     expose:
       - "80"
-    volumes:
-      - ./deployment/nginx/dokploy.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - kibo360-internal
 

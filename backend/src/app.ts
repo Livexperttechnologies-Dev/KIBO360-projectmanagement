@@ -11,6 +11,11 @@ import { persistStore } from "./lib/persistence";
 
 const app = express();
 
+// Behind Dokploy's Traefik (and optionally the frontend nginx), trust the
+// configured number of proxy hops so req.ip and the rate limiters see the real
+// client address instead of the proxy's.
+app.set("trust proxy", env.TRUST_PROXY);
+
 // Security and utility middleware
 app.use(helmet());
 app.use(cookieParser());

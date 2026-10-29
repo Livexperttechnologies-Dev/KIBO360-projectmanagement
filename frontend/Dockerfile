@@ -8,7 +8,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Accept build arguments for environment-specific API endpoints
+# API base URL baked into the bundle. Keep the default (/api/v1) when this
+# container proxies /api/ to the backend via API_UPSTREAM; otherwise pass the
+# backend's public URL, e.g. https://api.example.com/api/v1
 ARG VITE_API_URL=/api/v1
 ENV VITE_API_URL=$VITE_API_URL
 
@@ -22,53 +24,16 @@ COPY public ./public/
 RUN npm run build
 
 # Stage 2: Serve with lightweight Nginx Alpine
-FROM nginx:1.25-alpine AS runner
+FROM nginx:1.27-alpine AS runner
 
-# Remove default nginx configurations
-RUN rm -rf /etc/nginx/conf.d/*
+# Replace the default site with the SPA config
+RUN rm -rf /etc/nginx/conf.d/* && mkdir -p /etc/nginx/kibo360 && touch /etc/nginx/kibo360/api-proxy.conf
+COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 
-# Copy custom Nginx configuration
-COPY <<EOF /etc/nginx/conf.d/default.conf
-server {
-    listen 80;
-    server_name localhost;
-    root /usr/share/nginx/html;
-    index index.html;
-
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_min_length 1024;
-    gzip_proxied any;
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript image/svg+xml;
-
-    # Cache static assets with unique hashes
-    location /assets/ {
-        expires 1y;
-        add_header Cache-Control "public, max-age=31536000, immutable";
-        try_files \$uri =404;
-    }
-
-    # SPA routing fallback
-    location / {
-        try_files \$uri \$uri/ /index.html;
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-    }
-
-    # Health check endpoint for container orchestrators
-    location /health {
-        access_log off;
-        return 200 '{"status":"healthy"}';
-        add_header Content-Type application/json;
-    }
-}
-EOF
+# Generates the optional /api/ proxy from API_UPSTREAM at container start.
+# sed guards against CRLF line endings from a Windows checkout.
+COPY nginx/40-api-proxy.sh /docker-entrypoint.d/40-api-proxy.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.d/40-api-proxy.sh && chmod +x /docker-entrypoint.d/40-api-proxy.sh
 
 # Copy compiled static assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html

@@ -18,6 +18,8 @@ const envSchema = z.object({
   COMPANY_TIMEZONE: z.string().default("Asia/Kolkata"),
   RATE_LIMIT_WINDOW_MS: z.string().default("900000").transform((val) => parseInt(val, 10)), // 15 mins
   RATE_LIMIT_MAX_REQUESTS: z.string().default("1000").transform((val) => parseInt(val, 10)),
+  // Number of reverse proxies in front of the API (0 when exposed directly)
+  TRUST_PROXY: z.string().default("1").transform((val) => parseInt(val, 10)),
 }).refine((data) => {
   if (data.NODE_ENV === "production") {
     if (data.JWT_ACCESS_SECRET === "kibo360-livexpert-access-token-secret-2026") {

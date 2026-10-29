@@ -1,6 +1,6 @@
 # Production deployment runbook
 
-The supported production deployment path is Dokploy using the repository's `docker-compose.prod.yml`.
+The supported production deployment path is Dokploy, either as two Dockerfile applications (`backend/Dockerfile`, `frontend/Dockerfile`) or with the repository's `docker-compose.prod.yml`.
 
 Follow the [Dokploy deployment guide](dokploy.md) for initial setup, required variables, domain and HTTPS configuration, initial super-admin provisioning, database migration behavior, health checks, and troubleshooting.
 
