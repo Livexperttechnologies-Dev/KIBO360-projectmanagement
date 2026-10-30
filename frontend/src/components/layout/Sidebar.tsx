@@ -19,6 +19,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { fetchProjects } from "../../api/project";
 import { fetchTasks } from "../../api/task";
 import { notificationApi } from "../../api/notification";
+import { API_BASE_URL } from "../../api/client";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { user, token } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [canManageSettings, setCanManageSettings] = useState(false);
   const [menuCounts, setMenuCounts] = useState<{ projects: number | null; tasks: number | null; notifications: number | null }>({ projects: null, tasks: null, notifications: null });
 
   useEffect(() => {
@@ -59,6 +61,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     };
   }, [token, user?.id]);
 
+  useEffect(() => {
+    if (!token) {
+      setCanManageSettings(false);
+      return;
+    }
+
+    let isCurrent = true;
+    fetch(`${API_BASE_URL}/auth/two-factor`, {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
+    })
+      .then((response) => response.json())
+      .then((result) => {
+        if (isCurrent) setCanManageSettings(Boolean(result?.data?.canManageEnforcement));
+      })
+      .catch(() => {
+        if (isCurrent) setCanManageSettings(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [token, user?.id]);
+
   const workspaceItems = [
     { name: "Projects", path: "/projects", icon: FolderKanban, badge: menuCounts.projects != null && String(menuCounts.projects) },
     { name: "My Tasks", path: "/my-tasks", icon: CheckSquare, badge: menuCounts.tasks != null && String(menuCounts.tasks) },
@@ -76,7 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     : [];
 
   const systemItems = [
-    { name: "Settings", path: "/settings", icon: Settings },
+    ...(canManageSettings ? [{ name: "Settings", path: "/settings", icon: Settings }] : []),
     ...adminNavItems,
   ];
   const accountItems = [{ name: "My Profile", path: "/profile", icon: UserCircle }];
@@ -165,10 +191,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             {insightItems.map(renderNavItem)}
           </section>
 
-          <section className="space-y-1.5 border-t border-white/10 pt-4">
-            {!isCollapsed && <h2 className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9f7ba8]">System</h2>}
-            {systemItems.map(renderNavItem)}
-          </section>
+          {systemItems.length > 0 && (
+            <section className="space-y-1.5 border-t border-white/10 pt-4">
+              {!isCollapsed && <h2 className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9f7ba8]">System</h2>}
+              {systemItems.map(renderNavItem)}
+            </section>
+          )}
 
           <section className="space-y-1.5 border-t border-white/10 pt-4">
             {!isCollapsed && <h2 className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9f7ba8]">Account</h2>}

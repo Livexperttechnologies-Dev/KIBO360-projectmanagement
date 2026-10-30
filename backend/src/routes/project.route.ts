@@ -11,6 +11,10 @@ import {
   updateMilestone,
   deleteMilestone,
 } from "../controllers/project.controller";
+import {
+  listProjectIssues, createProjectIssue, updateProjectIssue,
+  listProjectTimeEntries, createProjectTimeEntry, deleteProjectTimeEntry,
+} from "../controllers/project-work.controller";
 import { authenticate } from "../middleware/auth";
 import { validateRequest } from "../middleware/validateRequest";
 import {
@@ -20,6 +24,7 @@ import {
   createMilestoneSchema,
   updateMilestoneSchema,
 } from "../validations/project.validation";
+import { createProjectIssueSchema, updateProjectIssueSchema, createProjectTimeEntrySchema } from "../validations/project-work.validation";
 
 const router = Router();
 
@@ -40,5 +45,13 @@ router.delete("/:id/members/:userId", removeMember);
 router.post("/:id/milestones", validateRequest(createMilestoneSchema), createMilestone);
 router.patch("/:id/milestones/:milestoneId", validateRequest(updateMilestoneSchema), updateMilestone);
 router.delete("/:id/milestones/:milestoneId", deleteMilestone);
+
+// Project issue reporting and work time records
+router.get("/:id/issues", listProjectIssues);
+router.post("/:id/issues", validateRequest(createProjectIssueSchema), createProjectIssue);
+router.patch("/:id/issues/:issueId", validateRequest(updateProjectIssueSchema), updateProjectIssue);
+router.get("/:id/time-logs", listProjectTimeEntries);
+router.post("/:id/time-logs", validateRequest(createProjectTimeEntrySchema), createProjectTimeEntry);
+router.delete("/:id/time-logs/:entryId", deleteProjectTimeEntry);
 
 export default router;

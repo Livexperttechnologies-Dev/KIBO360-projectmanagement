@@ -13,6 +13,8 @@ const collections = [
   "projects",
   "projectMembers",
   "milestones",
+  "projectIssues",
+  "projectTimeEntries",
   "tasks",
   "taskComments",
   "taskAttachments",
@@ -28,6 +30,11 @@ type StoreSnapshot = Record<CollectionName, Array<{ id: string; [key: string]: a
 let lastPersisted: StoreSnapshot | undefined;
 let writeQueue: Promise<void> = Promise.resolve();
 let databaseAvailable = false;
+let projectWorkTablesAvailable = true;
+
+export function areProjectWorkTablesAvailable() {
+  return projectWorkTablesAvailable;
+}
 
 function isDatabaseUnavailable(error: any) {
   return error?.code === "P1001" || error?.errorCode === "P1001" || error?.code === "ECONNREFUSED" || error?.code === "ETIMEDOUT" ||
@@ -52,6 +59,7 @@ function delegateFor(collection: CollectionName): string {
     passwordResetTokens: "passwordResetToken",
     auditLogs: "auditLog",
     projectMembers: "projectMember",
+    projectTimeEntries: "projectTimeEntry",
     taskComments: "taskComment",
     taskAttachments: "taskAttachment",
     taskDependencies: "taskDependency",
@@ -79,6 +87,8 @@ function removeDemoSeedData() {
   dbStore.tasks = dbStore.tasks.filter((record) => !demoProjectIds.has(record.projectId) && !demoTaskIds.has(record.id));
   dbStore.projectMembers = dbStore.projectMembers.filter((record) => !demoProjectIds.has(record.projectId) && !demoUserIds.has(record.userId));
   dbStore.milestones = dbStore.milestones.filter((record) => !demoProjectIds.has(record.projectId));
+  dbStore.projectIssues = dbStore.projectIssues.filter((record) => !demoProjectIds.has(record.projectId) && !demoTaskIds.has(record.taskId || "") && !demoUserIds.has(record.reporterId));
+  dbStore.projectTimeEntries = dbStore.projectTimeEntries.filter((record) => !demoProjectIds.has(record.projectId) && !demoTaskIds.has(record.taskId) && !demoUserIds.has(record.userId));
   dbStore.taskComments = dbStore.taskComments.filter((record) => !demoTaskIds.has(record.taskId) && !demoUserIds.has(record.userId));
   dbStore.taskAttachments = dbStore.taskAttachments.filter((record) => !demoTaskIds.has(record.taskId) && !demoUserIds.has(record.uploaderId));
   dbStore.taskDependencies = dbStore.taskDependencies.filter((record) => !demoTaskIds.has(record.taskId) && !demoTaskIds.has(record.dependsOnTaskId));
@@ -160,6 +170,8 @@ const deleteOrder: CollectionName[] = [
   "auditLogs",
   "projectMembers",
   "milestones",
+  "projectIssues",
+  "projectTimeEntries",
   "tasks",
   "projects",
   "profiles",
@@ -176,6 +188,8 @@ const upsertOrder: CollectionName[] = [
   "projectMembers",
   "milestones",
   "tasks",
+  "projectIssues",
+  "projectTimeEntries",
   "taskComments",
   "taskAttachments",
   "taskDependencies",
@@ -195,6 +209,7 @@ async function writeSnapshot(current: StoreSnapshot) {
   await prisma.$transaction(async (tx) => {
     // Delete only records previously loaded by this app and removed from its store.
     for (const collection of deleteOrder) {
+      if (!projectWorkTablesAvailable && (collection === "projectIssues" || collection === "projectTimeEntries")) continue;
       const currentIds = new Set(current[collection].map((record) => record.id));
       const removedIds = previous[collection]
         .map((record) => record.id)
@@ -205,6 +220,7 @@ async function writeSnapshot(current: StoreSnapshot) {
     }
 
     for (const collection of upsertOrder) {
+      if (!projectWorkTablesAvailable && (collection === "projectIssues" || collection === "projectTimeEntries")) continue;
       await syncCollection(tx, collection, previous, current);
     }
   }, { timeout: 30_000 });
@@ -234,10 +250,26 @@ async function loadSnapshot(): Promise<StoreSnapshot> {
     prisma.backgroundJob.findMany(),
   ]);
 
+  let projectWorkRows: any[][];
+  try {
+    projectWorkRows = await Promise.all([
+      prisma.projectIssue.findMany(),
+      prisma.projectTimeEntry.findMany(),
+    ]);
+    projectWorkTablesAvailable = true;
+  } catch (error: any) {
+    if (error?.code !== "P2021" || !["ProjectIssue", "ProjectTimeEntry"].includes(error?.meta?.modelName)) throw error;
+    projectWorkTablesAvailable = false;
+    projectWorkRows = [[], []];
+    console.warn("Project issue/time-log tables are missing; login and other features remain available, but Issues and Time Logs require pending database migrations.");
+  }
+
+  const orderedRows = [...rows.slice(0, 11), ...projectWorkRows, ...rows.slice(11)];
+
   return Object.fromEntries(
     collections.map((name, index) => [
       name,
-      (rows[index] as any[]).map((record) => fromDatabaseRow(name, record)),
+      (orderedRows[index] as any[]).map((record) => fromDatabaseRow(name, record)),
     ])
   ) as StoreSnapshot;
 }
@@ -249,6 +281,7 @@ export async function initializePersistence() {
   } catch (error) {
     if (process.env.NODE_ENV !== "development" || !isDatabaseUnavailable(error)) throw error;
     databaseAvailable = false;
+    projectWorkTablesAvailable = false;
     removeDemoSeedData();
     console.warn("PostgreSQL is unavailable; using minimal local bootstrap data. Changes will not persist after restart.");
     return;
@@ -259,6 +292,7 @@ export async function initializePersistence() {
   } catch (error) {
     if (process.env.NODE_ENV !== "development" || !isDatabaseUnavailable(error)) throw error;
     databaseAvailable = false;
+    projectWorkTablesAvailable = false;
     await prisma.$disconnect().catch(() => undefined);
     removeDemoSeedData();
     console.warn("PostgreSQL could not load application data; using minimal local bootstrap data. Changes will not persist after restart.");

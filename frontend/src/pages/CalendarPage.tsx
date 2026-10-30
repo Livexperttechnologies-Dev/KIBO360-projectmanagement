@@ -19,6 +19,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { calendarApi, CalendarEvent, CalendarSummary, DeadlineClassification } from "../api/calendar";
 import { fetchProjects, ProjectItem } from "../api/project";
 import { fetchUsers, UserSummary } from "../api/user";
+import { fetchTasks, TaskItem } from "../api/task";
 import { CalendarMonthView } from "../components/calendar/CalendarMonthView";
 import { CalendarWeekView } from "../components/calendar/CalendarWeekView";
 import { CalendarDayView } from "../components/calendar/CalendarDayView";
@@ -50,6 +51,8 @@ export const CalendarPage: React.FC = () => {
 
   // Data State
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [unscheduledTasks, setUnscheduledTasks] = useState<TaskItem[]>([]);
+  const [unscheduledLoading, setUnscheduledLoading] = useState(false);
   const [summary, setSummary] = useState<CalendarSummary>({
     totalEvents: 0,
     totalTasks: 0,
@@ -145,9 +148,48 @@ export const CalendarPage: React.FC = () => {
     selectedUrgency,
   ]);
 
+  // Tasks without a due date cannot be placed in a calendar cell. Keep them
+  // visible here so newly created tasks are discoverable until they are dated.
+  const loadUnscheduledTasks = useCallback(async () => {
+    if (!token) return;
+    setUnscheduledLoading(true);
+    try {
+      const firstPage = await fetchTasks({ page: 1, limit: 100 }, token);
+      const taskPages = await Promise.all(
+        Array.from({ length: Math.max(0, firstPage.pagination.totalPages - 1) }, (_, index) =>
+          fetchTasks({ page: index + 2, limit: 100 }, token)
+        )
+      );
+      setUnscheduledTasks([...firstPage.tasks, ...taskPages.flatMap((page) => page.tasks)].filter((task) => !task.dueDate));
+    } catch (err) {
+      console.error("Error loading unscheduled calendar tasks:", err);
+      setUnscheduledTasks([]);
+    } finally {
+      setUnscheduledLoading(false);
+    }
+  }, [token]);
+
   useEffect(() => {
     loadCalendarEvents();
   }, [loadCalendarEvents]);
+
+  useEffect(() => {
+    loadUnscheduledTasks();
+  }, [loadUnscheduledTasks]);
+
+  const visibleUnscheduledTasks = useMemo(() => {
+    if (selectedType === "MILESTONE" || selectedUrgency !== "ALL") return [];
+    return unscheduledTasks.filter((task) => {
+      if (selectedProject !== "all" && task.projectId !== selectedProject) return false;
+      if (selectedUser !== "all" && task.assigneeId !== selectedUser && task.reviewerId !== selectedUser) return false;
+      if (selectedStatus !== "all" && task.status !== selectedStatus) return false;
+      if (selectedDepartment !== "all") {
+        const project = projects.find((item) => item.id === task.projectId);
+        if (project?.department?.id !== selectedDepartment) return false;
+      }
+      return true;
+    });
+  }, [unscheduledTasks, selectedType, selectedUrgency, selectedProject, selectedUser, selectedStatus, selectedDepartment, projects]);
 
   // Navigation handlers
   const handlePrevious = () => {
@@ -553,12 +595,57 @@ export const CalendarPage: React.FC = () => {
         </div>
       )}
 
+      {selectedType !== "MILESTONE" && selectedUrgency === "ALL" && (
+        <section className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm" aria-label="Unscheduled tasks">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Unscheduled tasks</h3>
+              <p className="mt-1 text-xs text-slate-500">Tasks without a due date are listed here until a date is set.</p>
+            </div>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+              {visibleUnscheduledTasks.length}
+            </span>
+          </div>
+          {unscheduledLoading ? (
+            <p className="px-5 py-6 text-center text-sm text-slate-500">Loading unscheduled tasks…</p>
+          ) : visibleUnscheduledTasks.length === 0 ? (
+            <p className="px-5 py-6 text-center text-sm text-slate-500">No unscheduled tasks match these filters.</p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {visibleUnscheduledTasks.map((task) => (
+                <button
+                  key={task.id}
+                  type="button"
+                  onClick={() => setSelectedTaskId(task.id)}
+                  className="grid w-full gap-2 px-5 py-3 text-left transition-colors hover:bg-purple-50/50 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-slate-800">{task.title}</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {task.project ? `[${task.project.key}] ${task.project.title}` : "Project unavailable"}
+                    </span>
+                  </span>
+                  <span className="text-xs text-slate-600">Assignee: {task.assignee?.name || "Unassigned"}</span>
+                  <span className="text-xs text-slate-600">Reviewer: {task.reviewer?.name || "None"}</span>
+                  <span className="justify-self-start rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 sm:justify-self-end">
+                    {task.status.replace(/_/g, " ")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Task Details Modal */}
       <TaskDetailModal
         taskId={selectedTaskId}
         isOpen={!!selectedTaskId}
         onClose={() => setSelectedTaskId(null)}
-        onTaskUpdated={loadCalendarEvents}
+        onTaskUpdated={() => {
+          void loadCalendarEvents();
+          void loadUnscheduledTasks();
+        }}
       />
 
       {/* Milestone Details Modal */}

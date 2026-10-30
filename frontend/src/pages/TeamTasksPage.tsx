@@ -37,10 +37,23 @@ const KANBAN_COLUMNS = [
   { key: "BLOCKED", label: "Blocked", color: "border-red-400", bg: "bg-red-50/40" },
 ];
 
+const getTaskStatusBadgeVariant = (status: TaskItem["status"]): "primary" | "magenta" | "coral" | "lavender" | "success" | "warning" | "neutral" => {
+  switch (status) {
+    case "COMPLETED": return "success";
+    case "IN_PROGRESS": return "primary";
+    case "UNDER_REVIEW":
+    case "IN_REVIEW": return "magenta";
+    case "CHANGES_REQUIRED": return "warning";
+    case "BLOCKED": return "coral";
+    case "ASSIGNED": return "lavender";
+    default: return "neutral";
+  }
+};
+
 export const TeamTasksPage: React.FC = () => {
   const { token, user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("list");
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +64,7 @@ export const TeamTasksPage: React.FC = () => {
 
   // Filter values
   const [search, setSearch] = useState("");
-  const [selectedProject, setSelectedProject] = useState("all");
+  const [selectedProject, setSelectedProject] = useState(() => searchParams.get("projectId") || "all");
   const [selectedAssignee, setSelectedAssignee] = useState("all");
   const [selectedPriority, setSelectedPriority] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -485,23 +498,25 @@ export const TeamTasksPage: React.FC = () => {
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full min-w-[1100px] text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    <th className="py-3 px-4">Task</th>
-                    <th className="py-3 px-4">Project</th>
-                    <th className="py-3 px-4">Assignee</th>
-                    <th className="py-3 px-4">Priority</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4">Progress</th>
-                    <th className="py-3 px-4">Due Date</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
+                  <tr className="sticky top-0 z-10 border-b border-violet-100 bg-[#faf8fc] text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    <th className="py-3.5 px-4">Task</th>
+                    <th className="py-3.5 px-4">Project</th>
+                    <th className="py-3.5 px-4">Assignee</th>
+                    <th className="py-3.5 px-4">Reviewer</th>
+                    <th className="py-3.5 px-4">Priority</th>
+                    <th className="py-3.5 px-4">Status</th>
+                    <th className="py-3.5 px-4">Progress</th>
+                    <th className="py-3.5 px-4">Start Date</th>
+                    <th className="py-3.5 px-4">Due Date</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
                   {tasks.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                      <td colSpan={10} className="py-12 text-center text-slate-400">
                         No tasks match the active filters.
                       </td>
                     </tr>
@@ -510,7 +525,7 @@ export const TeamTasksPage: React.FC = () => {
                       <tr
                         key={task.id}
                         onClick={() => handleOpenTask(task.id)}
-                        className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                        className="hover:bg-violet-50/50 transition-colors cursor-pointer group"
                       >
                         <td className="py-3.5 px-4 font-bold text-slate-900 group-hover:text-[#690BA8]">
                           <div className="flex items-center gap-2">
@@ -523,9 +538,12 @@ export const TeamTasksPage: React.FC = () => {
                           </div>
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className="font-semibold text-slate-700">
-                            {task.project ? task.project.title : "—"}
-                          </span>
+                          {task.project ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="w-fit rounded border border-violet-100 bg-violet-50 px-1.5 py-0.5 font-mono text-[9px] font-bold text-[#7200A5]">{task.project.key}</span>
+                              <span className="font-semibold text-slate-700">{task.project.title}</span>
+                            </div>
+                          ) : <span className="text-slate-400">—</span>}
                         </td>
                         <td className="py-3.5 px-4">
                           <span className="font-medium text-slate-600">
@@ -533,27 +551,38 @@ export const TeamTasksPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="py-3.5 px-4">
+                          {task.reviewer ? (
+                            <div className="flex items-center gap-2">
+                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-fuchsia-50 text-[9px] font-bold text-fuchsia-700">{task.reviewer.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span>
+                              <span className="font-medium text-slate-600">{task.reviewer.name}</span>
+                            </div>
+                          ) : <span className="text-slate-400">—</span>}
+                        </td>
+                        <td className="py-3.5 px-4">
                           <Badge variant={getPriorityBadgeVariant(task.priority)} size="sm">
                             {task.priority}
                           </Badge>
                         </td>
                         <td className="py-3.5 px-4">
-                          <Badge variant="neutral" size="sm">
-                            {task.status.replace("_", " ")}
+                          <Badge variant={getTaskStatusBadgeVariant(task.status)} size="sm">
+                            {task.status.replace(/_/g, " ")}
                           </Badge>
                         </td>
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-2">
                             <div className="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden">
                               <div
-                                className="bg-[#7200A5] h-1.5 rounded-full"
-                                style={{ width: `${task.completionPercentage}%` }}
+                                className="bg-[#7200A5] h-1.5 rounded-full transition-all"
+                                style={{ width: `${Math.min(100, Math.max(0, task.completionPercentage))}%` }}
                               />
                             </div>
                             <span className="text-[11px] text-slate-500 font-semibold">
                               {task.completionPercentage}%
                             </span>
                           </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-500">
+                          {task.startDate ? new Date(task.startDate).toLocaleDateString() : "—"}
                         </td>
                         <td className="py-3.5 px-4 text-slate-500">
                           {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "—"}

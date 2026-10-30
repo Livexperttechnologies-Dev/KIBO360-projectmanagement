@@ -17,6 +17,7 @@ export type TaskStatus =
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type ProjectPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type MilestoneStatus = "PENDING" | "REACHED" | "OVERDUE";
+export type ProjectIssueStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
 export type ProjectMemberRole = "LEAD" | "CONTRIBUTOR" | "VIEWER";
 export type AttachmentAccessScope = "PUBLIC" | "PROJECT_MEMBERS" | "ASSIGNEE_ONLY";
 
@@ -122,6 +123,17 @@ export interface MilestoneRecord {
   reachedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface ProjectIssueRecord {
+  id: string; projectId: string; taskId?: string; reporterId: string; assigneeId?: string;
+  title: string; description: string; priority: TaskPriority; status: ProjectIssueStatus;
+  createdAt: Date; updatedAt: Date;
+}
+
+export interface ProjectTimeEntryRecord {
+  id: string; projectId: string; taskId: string; userId: string; workDate: Date;
+  durationMinutes: number; note?: string; createdAt: Date; updatedAt: Date;
 }
 
 export interface ProjectRecord {
@@ -260,6 +272,8 @@ class HubDatabaseStore {
   public projects: ProjectRecord[] = [];
   public projectMembers: ProjectMemberRecord[] = [];
   public milestones: MilestoneRecord[] = [];
+  public projectIssues: ProjectIssueRecord[] = [];
+  public projectTimeEntries: ProjectTimeEntryRecord[] = [];
   public tasks: TaskRecord[] = [];
   public taskComments: TaskCommentRecord[] = [];
   public taskAttachments: TaskAttachmentRecord[] = [];
@@ -1163,6 +1177,32 @@ class HubDatabaseStore {
 
   public getTaskById(id: string): TaskRecord | undefined {
     return this.tasks.find((t) => t.id === id);
+  }
+
+  public createProjectIssue(data: Omit<ProjectIssueRecord, "id" | "createdAt" | "updatedAt">): ProjectIssueRecord {
+    const issue: ProjectIssueRecord = { id: `issue-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...data, createdAt: new Date(), updatedAt: new Date() };
+    this.projectIssues.unshift(issue);
+    return issue;
+  }
+
+  public updateProjectIssue(id: string, updates: Partial<ProjectIssueRecord>): ProjectIssueRecord | undefined {
+    const issue = this.projectIssues.find((record) => record.id === id);
+    if (!issue) return undefined;
+    Object.assign(issue, updates, { updatedAt: new Date() });
+    return issue;
+  }
+
+  public createProjectTimeEntry(data: Omit<ProjectTimeEntryRecord, "id" | "createdAt" | "updatedAt">): ProjectTimeEntryRecord {
+    const entry: ProjectTimeEntryRecord = { id: `time-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, ...data, createdAt: new Date(), updatedAt: new Date() };
+    this.projectTimeEntries.unshift(entry);
+    return entry;
+  }
+
+  public deleteProjectTimeEntry(id: string): boolean {
+    const index = this.projectTimeEntries.findIndex((entry) => entry.id === id);
+    if (index < 0) return false;
+    this.projectTimeEntries.splice(index, 1);
+    return true;
   }
 
   public getFullUser(user: UserRecord) {

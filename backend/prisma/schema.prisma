@@ -61,6 +61,13 @@ enum MilestoneStatus {
   OVERDUE
 }
 
+enum ProjectIssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
 model Department {
   id          String   @id @default(uuid())
   name        String   @unique // "Software / IT" or "Product / Design"
@@ -103,6 +110,9 @@ model User {
   notifications      Notification[]
   notificationPreference NotificationPreference?
   twoFactor              UserTwoFactor?
+  reportedIssues         ProjectIssue[] @relation("IssueReporter")
+  assignedIssues         ProjectIssue[] @relation("IssueAssignee")
+  projectTimeEntries     ProjectTimeEntry[]
 
   @@map("users")
 }
@@ -246,6 +256,8 @@ model Project {
   members    ProjectMember[]
   milestones Milestone[]
   tasks      Task[]
+  issues     ProjectIssue[]
+  timeEntries ProjectTimeEntry[]
 
   @@map("projects")
 }
@@ -262,6 +274,51 @@ model ProjectMember {
 
   @@unique([projectId, userId])
   @@map("project_members")
+}
+
+model ProjectIssue {
+  id          String             @id @default(uuid())
+  projectId   String             @map("project_id")
+  taskId      String?            @map("task_id")
+  reporterId  String             @map("reporter_id")
+  assigneeId  String?            @map("assignee_id")
+  title       String
+  description String
+  priority    TaskPriority       @default(MEDIUM)
+  status      ProjectIssueStatus @default(OPEN)
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task     Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  reporter User    @relation("IssueReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  assignee User?   @relation("IssueAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status])
+  @@index([taskId])
+  @@index([reporterId])
+  @@map("project_issues")
+}
+
+model ProjectTimeEntry {
+  id              String   @id @default(uuid())
+  projectId       String   @map("project_id")
+  taskId          String   @map("task_id")
+  userId          String   @map("user_id")
+  workDate        DateTime @map("work_date")
+  durationMinutes Int      @map("duration_minutes")
+  note            String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task    Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, workDate])
+  @@index([taskId])
+  @@index([userId, workDate])
+  @@map("project_time_entries")
 }
 
 model Milestone {
@@ -310,6 +367,8 @@ model Task {
   attachments TaskAttachment[]
   dependencies TaskDependency[] @relation("TaskDependencies")
   dependentOn  TaskDependency[] @relation("TaskDependentOn")
+  issues       ProjectIssue[]
+  timeEntries  ProjectTimeEntry[]
 
   @@index([projectId])
   @@index([assigneeId])

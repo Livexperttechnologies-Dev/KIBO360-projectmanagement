@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FolderKanban,
   Plus,
@@ -27,6 +28,7 @@ import { Input } from "../components/ui/Input";
 import { Modal } from "../components/ui/Modal";
 import { Spinner } from "../components/ui/Spinner";
 import { useAuth } from "../contexts/AuthContext";
+import { downloadTaskAttachment, fetchTaskById, fetchTasks, TaskAttachment, TaskItem } from "../api/task";
 import {
   ProjectItem,
   ProjectDetail,
@@ -41,11 +43,20 @@ import {
   createMilestone,
   updateMilestone,
   deleteMilestone,
+  ProjectIssueItem,
+  ProjectTimeEntryItem,
+  fetchProjectIssues,
+  createProjectIssue,
+  updateProjectIssue,
+  fetchProjectTimeEntries,
+  createProjectTimeEntry,
+  deleteProjectTimeEntry,
 } from "../api/project";
 import { API_BASE_URL } from "../api/client";
 
 export const ProjectsPage: React.FC = () => {
   const { user, token } = useAuth();
+  const navigate = useNavigate();
 
   // Project List State
   const [projects, setProjects] = useState<ProjectItem[]>([]);
@@ -80,7 +91,13 @@ export const ProjectsPage: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<ProjectDetail | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(false);
   const [detailsLoading, setDetailsLoading] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "milestones" | "members">("overview");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "tasks" | "overview" | "milestones" | "members" | "users" | "reports" | "documents" | "timeLogs" | "issues">("overview");
+  const [projectTasks, setProjectTasks] = useState<TaskItem[]>([]);
+  const [projectTasksError, setProjectTasksError] = useState<string | null>(null);
+  const [projectDocuments, setProjectDocuments] = useState<Array<{ taskId: string; taskTitle: string; attachment: TaskAttachment }>>([]);
+  const [projectDocumentsLoading, setProjectDocumentsLoading] = useState(false);
+  const [projectDocumentsLoaded, setProjectDocumentsLoaded] = useState(false);
+  const [projectDocumentsError, setProjectDocumentsError] = useState<string | null>(null);
 
   // Edit Project State inside Modal
   const [editTitle, setEditTitle] = useState<string>("");
@@ -108,6 +125,7 @@ export const ProjectsPage: React.FC = () => {
 
   // Check if current user can create projects
   const canCreateProject = user?.role === "ADMINISTRATOR" || user?.role === "MANAGER";
+  const canViewProjectDashboard = user?.role === "ADMINISTRATOR" || user?.role === "MANAGER";
 
   // Load project filters reference options
   useEffect(() => {
@@ -164,10 +182,16 @@ export const ProjectsPage: React.FC = () => {
   }, [search, statusFilter, deptFilter, priorityFilter, token]);
 
   // Open Project Details Modal
-  const handleOpenDetails = async (projectId: string) => {
+  const handleOpenDetails = async (projectId: string, initialTab: "dashboard" | "tasks" | "overview" = "overview") => {
     setIsDetailsOpen(true);
     setDetailsLoading(true);
-    setActiveTab("overview");
+    setSelectedProject(null);
+    setProjectTasks([]);
+    setProjectTasksError(null);
+    setProjectDocuments([]);
+    setProjectDocumentsLoaded(false);
+    setProjectDocumentsError(null);
+    setActiveTab(canViewProjectDashboard ? initialTab : "overview");
     setEditError(null);
     setMilestoneError(null);
     setMemberError(null);
@@ -182,10 +206,41 @@ export const ProjectsPage: React.FC = () => {
       setEditOwnerId(detail.owner?.id || "");
       setEditStartDate(detail.startDate ? detail.startDate.split("T")[0] : "");
       setEditTargetDate(detail.targetDate ? detail.targetDate.split("T")[0] : "");
+      try {
+        const firstPage = await fetchTasks({ projectId, limit: 100, page: 1 }, token);
+        const taskPages = await Promise.all(
+          Array.from({ length: Math.max(0, firstPage.pagination.totalPages - 1) }, (_, index) =>
+            fetchTasks({ projectId, limit: 100, page: index + 2 }, token)
+          )
+        );
+        setProjectTasks([...firstPage.tasks, ...taskPages.flatMap((page) => page.tasks)]);
+      } catch (err: any) {
+        setProjectTasksError(err.message || "Could not load project tasks");
+      }
     } catch (err: any) {
       setEditError(err.message);
     } finally {
       setDetailsLoading(false);
+    }
+  };
+
+  const loadProjectDocuments = async () => {
+    if (!selectedProject || projectDocumentsLoaded || projectDocumentsLoading) return;
+    setProjectDocumentsLoading(true);
+    setProjectDocumentsError(null);
+    try {
+      const tasksWithAttachments = projectTasks.filter((task) => task.attachmentsCount > 0);
+      const taskDetails = await Promise.all(tasksWithAttachments.map((task) => fetchTaskById(task.id, token)));
+      setProjectDocuments(taskDetails.flatMap((task) => task.attachments.map((attachment) => ({
+        taskId: task.id,
+        taskTitle: task.title,
+        attachment,
+      }))));
+      setProjectDocumentsLoaded(true);
+    } catch (err: any) {
+      setProjectDocumentsError(err.message || "Could not load project documents");
+    } finally {
+      setProjectDocumentsLoading(false);
     }
   };
 
@@ -441,7 +496,6 @@ export const ProjectsPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-2xl font-black text-slate-900 tracking-tight">Project Management</h2>
-            <Badge variant="primary" size="sm" className="font-bold">Phase 4</Badge>
           </div>
           <p className="text-xs text-slate-500 mt-1">
             Enterprise project portfolio, milestone delivery schedules, and member allocations for Livexpert Technologies.
@@ -600,9 +654,17 @@ export const ProjectsPage: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <h3 className="text-base font-bold text-slate-900 leading-snug line-clamp-1">
-                      {p.title}
-                    </h3>
+                    {canViewProjectDashboard ? (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDetails(p.id, "dashboard")}
+                        className="block max-w-full truncate text-left text-base font-bold leading-snug text-slate-900 hover:text-[#690BA8] focus:outline-none focus-visible:underline"
+                      >
+                        {p.title}
+                      </button>
+                    ) : (
+                      <h3 className="line-clamp-1 text-base font-bold leading-snug text-slate-900">{p.title}</h3>
+                    )}
                   </div>
                   <div>{getStatusBadge(p.status)}</div>
                 </div>
@@ -670,16 +732,38 @@ export const ProjectsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Action button */}
-                <div className="pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-center text-xs"
-                    onClick={() => handleOpenDetails(p.id)}
-                  >
-                    {p.canEdit ? "Manage Project" : "View Details"}
-                  </Button>
+                {/* Project dashboard/task actions are limited to administrators and managers. */}
+                <div className="space-y-2 pt-2">
+                  {canViewProjectDashboard ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-center text-xs"
+                        onClick={() => handleOpenDetails(p.id, "dashboard")}
+                      >
+                        View Dashboard
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-center text-xs"
+                        onClick={() => navigate(`/team-tasks?projectId=${encodeURIComponent(p.id)}`)}
+                      >
+                        View Tasks
+                      </Button>
+                    </div>
+                  ) : null}
+                  {(p.canEdit || !canViewProjectDashboard) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-center text-xs"
+                      onClick={() => handleOpenDetails(p.id)}
+                    >
+                      {p.canEdit ? "Manage Project" : "View Details"}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -839,6 +923,7 @@ export const ProjectsPage: React.FC = () => {
         onClose={() => setIsDetailsOpen(false)}
         title={selectedProject ? `${selectedProject.key} — ${selectedProject.title}` : "Project Details"}
         description="Comprehensive project overview, milestones, team members, and lifecycle settings."
+        size={canViewProjectDashboard ? "4xl" : activeTab === "issues" || activeTab === "timeLogs" ? "2xl" : "md"}
       >
         {detailsLoading ? (
           <div className="py-16 text-center space-y-2">
@@ -848,7 +933,54 @@ export const ProjectsPage: React.FC = () => {
         ) : selectedProject ? (
           <div className="space-y-4">
             {/* Modal Tabs Header */}
-            <div className="flex border-b border-slate-200 text-xs font-semibold">
+            <div className="flex flex-wrap border-b border-slate-200 text-xs font-semibold">
+              {canViewProjectDashboard && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("dashboard")}
+                  className={`pb-2.5 px-3 border-b-2 transition-colors ${
+                    activeTab === "dashboard"
+                      ? "border-[#690BA8] text-[#690BA8]"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Project Dashboard
+                </button>
+              )}
+              {canViewProjectDashboard && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("tasks")}
+                  className={`pb-2.5 px-3 border-b-2 transition-colors ${
+                    activeTab === "tasks"
+                      ? "border-[#690BA8] text-[#690BA8]"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Project Tasks ({projectTasks.length})
+                </button>
+              )}
+              {canViewProjectDashboard && (
+                <button type="button" onClick={() => setActiveTab("users")} className={`pb-2.5 px-3 border-b-2 transition-colors ${activeTab === "users" ? "border-[#690BA8] text-[#690BA8]" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
+                  Users
+                </button>
+              )}
+              {canViewProjectDashboard && (
+                <button type="button" onClick={() => setActiveTab("reports")} className={`pb-2.5 px-3 border-b-2 transition-colors ${activeTab === "reports" ? "border-[#690BA8] text-[#690BA8]" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
+                  Reports
+                </button>
+              )}
+              {canViewProjectDashboard && (
+                <button type="button" onClick={() => { setActiveTab("documents"); void loadProjectDocuments(); }} className={`pb-2.5 px-3 border-b-2 transition-colors ${activeTab === "documents" ? "border-[#690BA8] text-[#690BA8]" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
+                  Documents
+                </button>
+              )}
+              <button type="button" onClick={() => setActiveTab("timeLogs")} className={`pb-2.5 px-3 border-b-2 transition-colors ${activeTab === "timeLogs" ? "border-[#690BA8] text-[#690BA8]" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
+                Time Logs
+              </button>
+              <button type="button" onClick={() => setActiveTab("issues")} className={`pb-2.5 px-3 border-b-2 transition-colors ${activeTab === "issues" ? "border-[#690BA8] text-[#690BA8]" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
+                Issues
+              </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("overview")}
@@ -869,7 +1001,7 @@ export const ProjectsPage: React.FC = () => {
                     : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
-                Milestones ({selectedProject.milestones?.length || 0})
+                Phases ({selectedProject.milestones?.length || 0})
               </button>
               <button
                 type="button"
@@ -883,6 +1015,28 @@ export const ProjectsPage: React.FC = () => {
                 Team Members ({selectedProject.members?.length || 0})
               </button>
             </div>
+
+            {activeTab === "dashboard" && canViewProjectDashboard && (
+              <ProjectDashboard project={selectedProject} tasks={projectTasks} error={projectTasksError} />
+            )}
+            {activeTab === "tasks" && canViewProjectDashboard && (
+              <ProjectTasksPanel tasks={projectTasks} error={projectTasksError} />
+            )}
+            {activeTab === "users" && canViewProjectDashboard && (
+              <ProjectUsersPanel project={selectedProject} tasks={projectTasks} employees={availableEmployees} />
+            )}
+            {activeTab === "reports" && canViewProjectDashboard && (
+              <ProjectReportsPanel project={selectedProject} tasks={projectTasks} />
+            )}
+            {activeTab === "documents" && canViewProjectDashboard && (
+              <ProjectDocumentsPanel documents={projectDocuments} loading={projectDocumentsLoading} error={projectDocumentsError} token={token} />
+            )}
+            {activeTab === "timeLogs" && (
+              <ProjectTimeLogsPanel projectId={selectedProject.id} tasks={projectTasks} token={token} userId={user?.id || ""} canManage={selectedProject.canEdit} />
+            )}
+            {activeTab === "issues" && (
+              <ProjectIssuesPanel projectId={selectedProject.id} tasks={projectTasks} token={token} canManage={selectedProject.canEdit} />
+            )}
 
             {/* TAB 1: OVERVIEW & SETTINGS */}
             {activeTab === "overview" && (
@@ -1237,4 +1391,558 @@ export const ProjectsPage: React.FC = () => {
       </Modal>
     </div>
   );
+};
+
+const ProjectDashboard: React.FC<{
+  project: ProjectDetail;
+  tasks: TaskItem[];
+  error: string | null;
+}> = ({ project, tasks, error }) => {
+  const completedTasks = tasks.filter((task) => task.status === "COMPLETED").length;
+  const inProgressTasks = tasks.filter((task) => ["IN_PROGRESS", "UNDER_REVIEW", "CHANGES_REQUIRED"].includes(task.status)).length;
+  const overdueTasks = tasks.filter(
+    (task) => task.dueDate && task.status !== "COMPLETED" && new Date(task.dueDate).getTime() < Date.now()
+  ).length;
+  const blockedTasks = tasks.filter((task) => task.status === "BLOCKED" || task.isBlocked).length;
+  const totalComments = tasks.reduce((total, task) => total + task.commentsCount, 0);
+  const totalAttachments = tasks.reduce((total, task) => total + task.attachmentsCount, 0);
+  const totalDependencies = tasks.reduce((total, task) => total + task.dependenciesCount, 0);
+  const statusGroups = [
+    { label: "Open", statuses: ["OPEN", "TODO", "BACKLOG"] },
+    { label: "Assigned", statuses: ["ASSIGNED"] },
+    { label: "In Progress", statuses: ["IN_PROGRESS"] },
+    { label: "Under Review", statuses: ["UNDER_REVIEW", "IN_REVIEW"] },
+    { label: "Changes Required", statuses: ["CHANGES_REQUIRED"] },
+    { label: "Completed", statuses: ["COMPLETED"] },
+    { label: "Blocked", statuses: ["BLOCKED"] },
+  ];
+
+  type ProjectPerson = { id: string; name: string; email?: string; roles: string[]; assigned: number; completed: number; reviewed: number };
+  const people = new Map<string, ProjectPerson>();
+  const registerPerson = (person: { id: string; name: string; email?: string }, role: string) => {
+    const existing = people.get(person.id) || {
+      id: person.id,
+      name: person.name,
+      email: person.email,
+      roles: [],
+      assigned: 0,
+      completed: 0,
+      reviewed: 0,
+    };
+    if (person.email) existing.email = person.email;
+    if (!existing.roles.includes(role)) existing.roles.push(role);
+    people.set(existing.id, existing);
+    return existing;
+  };
+  for (const member of project.members || []) {
+    if (member.user) {
+      registerPerson(member.user, member.role);
+    }
+  }
+  for (const task of tasks) {
+    if (task.assignee) {
+      const person = registerPerson(task.assignee, "Assignee");
+      person.assigned += 1;
+      if (task.status === "COMPLETED") person.completed += 1;
+    }
+    if (task.reviewer) {
+      const person = registerPerson(task.reviewer, "Reviewer");
+      person.reviewed += 1;
+    }
+  }
+  if (project.owner) {
+    registerPerson(project.owner, "Project Owner");
+  }
+
+  return (
+    <div className="space-y-5 pt-1">
+      {error && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
+
+      <section className="rounded-xl border border-violet-100 bg-gradient-to-r from-violet-50/80 to-white p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs font-bold text-[#7200A5]">{project.key}</span>
+              <Badge variant="primary" size="sm">{project.status.replace(/_/g, " ")}</Badge>
+              <span className="text-xs text-slate-500">{project.department?.name || "No department"}</span>
+            </div>
+            <h4 className="mt-2 text-base font-bold text-slate-900">{project.title}</h4>
+            <p className="mt-1 max-w-3xl text-xs text-slate-600">{project.description || "No project description provided."}</p>
+          </div>
+          <div className="rounded-lg border border-violet-100 bg-white px-3 py-2 text-right">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Project progress</div>
+            <div className="text-xl font-extrabold text-[#7200A5]">{project.progress}%</div>
+          </div>
+        </div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+          <div className="h-full rounded-full bg-[#7200A5] transition-all" style={{ width: `${Math.min(100, Math.max(0, project.progress))}%` }} />
+        </div>
+        <div className="mt-3 grid gap-2 border-t border-violet-100 pt-3 text-[11px] sm:grid-cols-2 xl:grid-cols-4">
+          <div><span className="text-slate-400">Owner</span><div className="font-semibold text-slate-700">{project.owner?.name || "Unassigned"}</div></div>
+          <div><span className="text-slate-400">Priority</span><div className="font-semibold text-slate-700">{project.priority}</div></div>
+          <div><span className="text-slate-400">Start date</span><div className="font-semibold text-slate-700">{project.startDate ? new Date(project.startDate).toLocaleDateString() : "Not set"}</div></div>
+          <div><span className="text-slate-400">Target date</span><div className="font-semibold text-slate-700">{project.targetDate ? new Date(project.targetDate).toLocaleDateString() : "Not set"}</div></div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+        {[
+          { label: "Tasks & Subtasks", value: tasks.length, icon: <CheckCircle2 className="h-4 w-4 text-violet-600" /> },
+          { label: "Completed", value: completedTasks, icon: <CheckCircle2 className="h-4 w-4 text-emerald-600" /> },
+          { label: "In Progress", value: inProgressTasks, icon: <Clock className="h-4 w-4 text-blue-600" /> },
+          { label: "Overdue", value: overdueTasks, icon: <AlertTriangle className="h-4 w-4 text-rose-600" /> },
+          { label: "Blocked", value: blockedTasks, icon: <AlertTriangle className="h-4 w-4 text-orange-600" /> },
+          { label: "Team Members", value: people.size, icon: <Users className="h-4 w-4 text-fuchsia-600" /> },
+          { label: "Comments", value: totalComments, icon: <CheckCircle2 className="h-4 w-4 text-slate-500" /> },
+          { label: "Attachments", value: totalAttachments, icon: <CheckCircle2 className="h-4 w-4 text-slate-500" /> },
+          { label: "Dependencies", value: totalDependencies, icon: <CheckCircle2 className="h-4 w-4 text-slate-500" /> },
+        ].map((metric) => (
+          <div key={metric.label} className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+              {metric.label}{metric.icon}
+            </div>
+            <div className="mt-1 text-xl font-bold text-slate-900">{metric.value}</div>
+          </div>
+        ))}
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.85fr)]">
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h4 className="text-sm font-bold text-slate-900">Task Status</h4>
+            <span className="text-[11px] text-slate-500">{tasks.length} tasks and subtasks</span>
+          </div>
+          <div className="space-y-3">
+            {statusGroups.map((group) => {
+              const count = tasks.filter((task) => group.statuses.includes(task.status)).length;
+              const percent = tasks.length ? Math.round((count / tasks.length) * 100) : 0;
+              return (
+                <div key={group.label}>
+                  <div className="mb-1 flex justify-between text-[11px]">
+                    <span className="text-slate-600">{group.label}</span><span className="font-semibold text-slate-700">{count}</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div className="h-full rounded-full bg-[#7200A5]" style={{ width: `${percent}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
+            {project.milestones?.length || 0} milestones · {project.milestones?.filter((milestone) => milestone.status === "REACHED").length || 0} reached
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h4 className="text-sm font-bold text-slate-900">Team Workload</h4>
+            <span className="text-[11px] text-slate-500">{people.size} people</span>
+          </div>
+          {people.size === 0 ? (
+            <p className="py-5 text-center text-xs text-slate-500">No project members or task assignees yet.</p>
+          ) : (
+            <div className="max-h-96 overflow-auto">
+              <table className="w-full min-w-[560px] text-left text-xs">
+                <thead className="sticky top-0 z-10 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2.5">Person</th>
+                    <th className="px-3 py-2.5">Project roles</th>
+                    <th className="px-3 py-2.5 text-right">Assigned</th>
+                    <th className="px-3 py-2.5 text-right">Completed</th>
+                    <th className="px-3 py-2.5 text-right">Reviews</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {[...people.values()].sort((a, b) => b.assigned - a.assigned).map((person) => (
+                    <tr key={person.id} className="hover:bg-violet-50/40">
+                      <td className="px-3 py-3">
+                        <div className="font-semibold text-slate-800">{person.name}</div>
+                        {person.email && <div className="mt-0.5 truncate text-[10px] text-slate-500">{person.email}</div>}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex flex-wrap gap-1">{person.roles.map((role) => <span key={role} className="rounded-full border border-violet-100 bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700">{role.replace(/_/g, " ")}</span>)}</div>
+                      </td>
+                      <td className="px-3 py-3 text-right font-medium text-slate-700">{person.assigned}</td>
+                      <td className="px-3 py-3 text-right font-medium text-emerald-700">{person.completed}</td>
+                      <td className="px-3 py-3 text-right font-medium text-slate-700">{person.reviewed}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <h4 className="text-sm font-bold text-slate-900">Project Tasks</h4>
+        </div>
+        {tasks.length === 0 ? (
+          <p className="p-6 text-center text-xs text-slate-500">No tasks have been added to this project.</p>
+        ) : (
+          <div className="max-h-72 overflow-auto">
+            <table className="w-full min-w-[1000px] text-left text-xs">
+              <thead className="sticky top-0 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+                <tr><th className="px-4 py-2">Task</th><th className="px-4 py-2">Assignee</th><th className="px-4 py-2">Reviewer</th><th className="px-4 py-2">Status</th><th className="px-4 py-2">Priority</th><th className="px-4 py-2">Progress</th><th className="px-4 py-2">Due date</th><th className="px-4 py-2">Related work</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {tasks.map((task) => (
+                  <tr key={task.id}>
+                    <td className="max-w-64 truncate px-4 py-2.5 font-semibold text-slate-800">{task.title}</td>
+                    <td className="px-4 py-2.5 text-slate-600">{task.assignee?.name || "Unassigned"}</td>
+                    <td className="px-4 py-2.5 text-slate-600">{task.reviewer?.name || "—"}</td>
+                    <td className="px-4 py-2.5 text-slate-600">{task.status.replace(/_/g, " ")}</td>
+                    <td className="px-4 py-2.5 text-slate-600">{task.priority}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#7200A5]" style={{ width: `${Math.min(100, Math.max(0, task.completionPercentage))}%` }} /></div><span className="text-slate-600">{task.completionPercentage}%</span></div>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-600">{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "—"}</td>
+                    <td className="px-4 py-2.5 text-slate-500">{task.subtasksCount} subtasks · {task.commentsCount} comments · {task.attachmentsCount} files · {task.dependenciesCount} dependencies</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+};
+
+const ProjectTasksPanel: React.FC<{ tasks: TaskItem[]; error: string | null }> = ({ tasks, error }) => {
+  const taskGroups = Array.from(
+    tasks.reduce((groups, task) => {
+      const groupName = task.taskList?.trim() || "General";
+      const group = groups.get(groupName) || [];
+      group.push(task);
+      groups.set(groupName, group);
+      return groups;
+    }, new Map<string, TaskItem[]>()).entries()
+  );
+
+  return (
+    <section className="space-y-3 pt-1">
+      {error && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h4 className="text-sm font-bold text-slate-900">Project task list</h4>
+          <p className="mt-1 text-xs text-slate-500">Tasks grouped by task list, with owners, reviewers, progress, and dates.</p>
+        </div>
+        <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">{tasks.length} tasks</span>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        {tasks.length === 0 ? (
+          <p className="p-8 text-center text-xs text-slate-500">No tasks have been added to this project.</p>
+        ) : (
+          <div className="max-h-[60vh] overflow-auto">
+            <table className="w-full min-w-[1120px] text-left text-xs">
+              <thead className="sticky top-0 z-10 border-b border-violet-100 bg-[#faf8fc] text-[10px] uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Task name</th>
+                  <th className="px-4 py-3">Owner</th>
+                  <th className="px-4 py-3">Reviewer</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Priority</th>
+                  <th className="px-4 py-3">Progress</th>
+                  <th className="px-4 py-3">Start date</th>
+                  <th className="px-4 py-3">Due date</th>
+                  <th className="px-4 py-3">Related work</th>
+                </tr>
+              </thead>
+              {taskGroups.map(([groupName, groupTasks]) => (
+                <tbody key={groupName} className="divide-y divide-slate-100">
+                  <tr className="border-y border-slate-200 bg-slate-50/80">
+                    <th colSpan={9} className="px-4 py-2.5 text-left font-bold text-slate-700">
+                      <span className="mr-2 text-[#7200A5]">⌄</span>{groupName}
+                      <span className="ml-2 font-medium text-slate-400">({groupTasks.length})</span>
+                    </th>
+                  </tr>
+                  {groupTasks.map((task) => (
+                    <tr key={task.id} className="transition-colors hover:bg-violet-50/40">
+                      <td className="max-w-72 px-4 py-3">
+                        <div className="truncate font-semibold text-slate-800">{task.title}</div>
+                        <div className="mt-0.5 text-[10px] text-slate-400">{task.parentTaskId ? "Subtask" : "Task"}</div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{task.assignee?.name || "Unassigned"}</td>
+                      <td className="px-4 py-3 text-slate-600">{task.reviewer?.name || "—"}</td>
+                      <td className="px-4 py-3"><Badge variant="neutral" size="sm">{task.status.replace(/_/g, " ")}</Badge></td>
+                      <td className="px-4 py-3 text-slate-600">{task.priority}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-[#7200A5]" style={{ width: `${Math.min(100, Math.max(0, task.completionPercentage))}%` }} />
+                          </div>
+                          <span className="text-slate-500">{task.completionPercentage}%</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{task.startDate ? new Date(task.startDate).toLocaleDateString() : "—"}</td>
+                      <td className="px-4 py-3 text-slate-600">{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "—"}</td>
+                      <td className="px-4 py-3 text-slate-500">{task.subtasksCount} subtasks · {task.commentsCount} comments · {task.attachmentsCount} files</td>
+                    </tr>
+                  ))}
+                </tbody>
+              ))}
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+const ProjectUsersPanel: React.FC<{
+  project: ProjectDetail;
+  tasks: TaskItem[];
+  employees: { id: string; name: string; email: string }[];
+}> = ({ project, tasks, employees }) => {
+  type Person = { id: string; name: string; email?: string; roles: string[]; assigned: number; assignedBy: number; reviewed: number; completed: number };
+  const people = new Map<string, Person>();
+  const addPerson = (person: { id: string; name: string; email?: string }, role: string) => {
+    const entry = people.get(person.id) || { ...person, roles: [], assigned: 0, assignedBy: 0, reviewed: 0, completed: 0 };
+    if (!entry.roles.includes(role)) entry.roles.push(role);
+    people.set(person.id, entry);
+    return entry;
+  };
+
+  for (const member of project.members || []) {
+    if (member.user) addPerson(member.user, member.role);
+  }
+  if (project.owner) addPerson(project.owner, "Project Owner");
+  for (const task of tasks) {
+    const creator = people.get(task.creatorId) || employees.find((employee) => employee.id === task.creatorId);
+    if (creator) addPerson(creator, "Task Creator").assignedBy += 1;
+    if (task.assignee) {
+      const assignee = addPerson(task.assignee, "Assignee");
+      assignee.assigned += 1;
+      if (task.status === "COMPLETED") assignee.completed += 1;
+    }
+    if (task.reviewer) addPerson(task.reviewer, "Reviewer").reviewed += 1;
+  }
+
+  const contributors = Array.from(people.values()).filter((person) => person.assigned > 0 || person.assignedBy > 0 || person.reviewed > 0);
+  return (
+    <section className="space-y-4 pt-1">
+      <div className="flex items-center justify-between">
+        <div>
+          <h4 className="text-sm font-bold text-slate-900">People working on this project</h4>
+          <p className="mt-1 text-xs text-slate-500">Assigned = tasks assigned to them; Assigned by = tasks they created; Reviewed = tasks they review; Completed = assigned tasks marked complete.</p>
+        </div>
+        <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">{contributors.length} contributors</span>
+      </div>
+      {people.size === 0 ? <p className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500">No project members or task participants yet.</p> : (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[860px] table-fixed text-left text-xs">
+              <colgroup>
+                <col className="w-[22%]" />
+                <col className="w-[40%]" />
+                <col className="w-[9%]" />
+                <col className="w-[11%]" />
+                <col className="w-[9%]" />
+                <col className="w-[9%]" />
+              </colgroup>
+              <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Person</th>
+                  <th className="px-4 py-3">Project roles</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Assigned</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Assigned by</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Reviewed</th>
+                  <th className="whitespace-nowrap px-3 py-3 text-right">Completed</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {Array.from(people.values()).sort((a, b) => (b.assigned + b.assignedBy) - (a.assigned + a.assignedBy)).map((person) => (
+                  <tr key={person.id} className="hover:bg-violet-50/40">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-slate-800">{person.name}</div>
+                      {person.email && <div className="mt-0.5 text-[10px] text-slate-500">{person.email}</div>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">{person.roles.map((role) => <Badge key={role} variant="primary" size="sm">{role.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())}</Badge>)}</div>
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-slate-700">{person.assigned}</td>
+                    <td className="px-4 py-3 text-right font-medium text-slate-700">{person.assignedBy}</td>
+                    <td className="px-4 py-3 text-right font-medium text-slate-700">{person.reviewed}</td>
+                    <td className="px-4 py-3 text-right font-medium text-emerald-700">{person.completed}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+};
+
+const ProjectReportsPanel: React.FC<{ project: ProjectDetail; tasks: TaskItem[] }> = ({ project, tasks }) => {
+  const completed = tasks.filter((task) => task.status === "COMPLETED").length;
+  const overdue = tasks.filter((task) => task.dueDate && task.status !== "COMPLETED" && new Date(task.dueDate).getTime() < Date.now()).length;
+  const statusGroups = [
+    { label: "Open", statuses: ["OPEN", "TODO", "BACKLOG"] },
+    { label: "Assigned", statuses: ["ASSIGNED"] },
+    { label: "In progress", statuses: ["IN_PROGRESS"] },
+    { label: "Under review", statuses: ["UNDER_REVIEW", "IN_REVIEW"] },
+    { label: "Changes required", statuses: ["CHANGES_REQUIRED"] },
+    { label: "Completed", statuses: ["COMPLETED"] },
+    { label: "Blocked", statuses: ["BLOCKED"] },
+  ];
+  return (
+    <section className="space-y-4 pt-1">
+      <div><h4 className="text-sm font-bold text-slate-900">Project reports</h4><p className="mt-1 text-xs text-slate-500">Read-only delivery metrics calculated from this project’s tasks and phases.</p></div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[
+          ["Tasks", tasks.length], ["Completed", completed], ["Overdue", overdue], ["Project progress", `${project.progress}%`],
+        ].map(([label, value]) => <div key={String(label)} className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-[11px] text-slate-500">{label}</div><div className="mt-1 text-xl font-bold text-slate-900">{value}</div></div>)}
+      </div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <h5 className="mb-4 text-xs font-bold text-slate-800">Task status report <span className="ml-1 font-normal text-slate-400">({tasks.length} total)</span></h5>
+        <div className="space-y-3">
+          {statusGroups.map((group) => {
+            const count = tasks.filter((task) => group.statuses.includes(task.status)).length;
+            const ratio = tasks.length ? Math.round((count / tasks.length) * 100) : 0;
+            return <div key={group.label}><div className="mb-1 flex justify-between text-[11px]"><span className="text-slate-600">{group.label}</span><span className="font-semibold text-slate-700">{count}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[#7200A5]" style={{ width: `${ratio}%` }} /></div></div>;
+          })}
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const ProjectDocumentsPanel: React.FC<{
+  documents: Array<{ taskId: string; taskTitle: string; attachment: TaskAttachment }>;
+  loading: boolean;
+  error: string | null;
+  token: string | null;
+}> = ({ documents, loading, error, token }) => {
+  const [downloadError, setDownloadError] = React.useState<string | null>(null);
+  const handleDownload = async (taskId: string, attachment: TaskAttachment) => {
+    setDownloadError(null);
+    try {
+      const blob = await downloadTaskAttachment(taskId, attachment.id, token);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = attachment.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setDownloadError(err.message || "Could not download this file");
+    }
+  };
+  return (
+    <section className="space-y-3 pt-1">
+      <div><h4 className="text-sm font-bold text-slate-900">Project documents</h4><p className="mt-1 text-xs text-slate-500">Files attached to tasks in this project.</p></div>
+      {(error || downloadError) && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error || downloadError}</div>}
+      {loading ? <p className="rounded-xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-500">Loading project documents…</p> : documents.length === 0 ? <p className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500">No task attachments are available for this project.</p> : (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <div className="grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto_auto] gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500"><span>File</span><span>Task</span><span>Size</span><span /></div>
+          {documents.map(({ taskId, taskTitle, attachment }) => <div key={attachment.id} className="grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-0"><div className="min-w-0"><div className="truncate text-xs font-semibold text-slate-800">{attachment.filename}</div><div className="text-[10px] text-slate-400">{attachment.mimetype}</div></div><span className="truncate text-xs text-slate-600">{taskTitle}</span><span className="text-[11px] text-slate-500">{Math.max(1, Math.round(attachment.filesize / 1024))} KB</span><Button size="sm" variant="outline" onClick={() => void handleDownload(taskId, attachment)}>Download</Button></div>)}
+        </div>
+      )}
+    </section>
+  );
+};
+
+const projectFieldClass = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-[#7200A5] focus:outline-none focus:ring-2 focus:ring-[#7200A5]/10";
+
+const ProjectIssuesPanel: React.FC<{ projectId: string; tasks: TaskItem[]; token: string | null; canManage: boolean }> = ({ projectId, tasks, token, canManage }) => {
+  const [issues, setIssues] = useState<ProjectIssueItem[]>([]);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [taskId, setTaskId] = useState("");
+  const [priority, setPriority] = useState<ProjectIssueItem["priority"]>("MEDIUM");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async () => {
+    setError(null);
+    try { setIssues(await fetchProjectIssues(projectId, token)); }
+    catch (err: any) { setError(err.message || "Could not load project issues"); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, [projectId, token]);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault(); setSaving(true); setError(null);
+    try {
+      await createProjectIssue(projectId, { title, description, taskId: taskId || undefined, priority }, token);
+      setTitle(""); setDescription(""); setTaskId(""); setPriority("MEDIUM");
+      await load();
+    } catch (err: any) { setError(err.message || "Could not report issue"); }
+    finally { setSaving(false); }
+  };
+
+  const changeStatus = async (issue: ProjectIssueItem, status: ProjectIssueItem["status"]) => {
+    setError(null);
+    try { await updateProjectIssue(projectId, issue.id, { status }, token); await load(); }
+    catch (err: any) { setError(err.message || "Could not update issue"); }
+  };
+
+  return <section className="space-y-4 pt-1">
+    <div><h4 className="text-sm font-bold text-slate-900">Report an issue</h4><p className="mt-1 text-xs text-slate-500">Report a project problem and optionally link it to a task. Project issues are visible to everyone who can access this project.</p></div>
+    {error && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
+    <form onSubmit={submit} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2">
+      <label className="space-y-1 text-[11px] font-semibold text-slate-600">Issue title<input className={projectFieldClass} required minLength={3} maxLength={160} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Briefly describe the issue" /></label>
+      <label className="space-y-1 text-[11px] font-semibold text-slate-600">Related task (optional)<select className={projectFieldClass} value={taskId} onChange={(e) => setTaskId(e.target.value)}><option value="">No task linked</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label>
+      <label className="space-y-1 text-[11px] font-semibold text-slate-600">Priority<select className={projectFieldClass} value={priority} onChange={(e) => setPriority(e.target.value as ProjectIssueItem["priority"])}>{["LOW", "MEDIUM", "HIGH", "URGENT"].map((value) => <option key={value}>{value}</option>)}</select></label>
+      <label className="space-y-1 text-[11px] font-semibold text-slate-600 sm:col-span-2">Details<textarea className={`${projectFieldClass} min-h-20 resize-y`} maxLength={4000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What happened? Include steps to reproduce if useful." /></label>
+      <div className="sm:col-span-2"><Button type="submit" size="sm" isLoading={saving}>Submit issue</Button></div>
+    </form>
+    <div><h4 className="mb-2 text-sm font-bold text-slate-900">Project issues <span className="font-normal text-slate-400">({issues.length})</span></h4>
+      {loading ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-500">Loading issues…</p> : issues.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500">No issues have been reported for this project.</p> : <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table className="w-full min-w-[720px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3">Issue</th><th className="px-3 py-3">Task</th><th className="px-3 py-3">Priority</th><th className="px-3 py-3">Reported by</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Date</th></tr></thead><tbody className="divide-y divide-slate-100">{issues.map((issue) => <tr key={issue.id}><td className="max-w-xs px-3 py-3"><div className="font-semibold text-slate-800">{issue.title}</div>{issue.description && <div className="mt-1 line-clamp-2 text-[11px] text-slate-500">{issue.description}</div>}</td><td className="px-3 py-3 text-slate-600">{issue.task?.title || "—"}</td><td className="px-3 py-3">{issue.priority}</td><td className="px-3 py-3 text-slate-600">{issue.reporter?.name || "Unknown"}</td><td className="px-3 py-3">{canManage ? <select aria-label={`Status for ${issue.title}`} className={projectFieldClass} value={issue.status} onChange={(e) => void changeStatus(issue, e.target.value as ProjectIssueItem["status"])}>{["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"].map((value) => <option key={value} value={value}>{value.replace("_", " ")}</option>)}</select> : <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700">{issue.status.replace("_", " ")}</span>}</td><td className="whitespace-nowrap px-3 py-3 text-slate-500">{new Date(issue.createdAt).toLocaleDateString()}</td></tr>)}</tbody></table></div>}
+    </div>
+  </section>;
+};
+
+const ProjectTimeLogsPanel: React.FC<{ projectId: string; tasks: TaskItem[]; token: string | null; userId: string; canManage: boolean }> = ({ projectId, tasks, token, userId, canManage }) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const [entries, setEntries] = useState<ProjectTimeEntryItem[]>([]);
+  const [taskId, setTaskId] = useState("");
+  const [workDate, setWorkDate] = useState(today);
+  const [hours, setHours] = useState("1");
+  const [note, setNote] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const load = async () => {
+    setError(null);
+    try { setEntries(await fetchProjectTimeEntries(projectId, token)); }
+    catch (err: any) { setError(err.message || "Could not load time logs"); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, [projectId, token]);
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault(); setSaving(true); setError(null);
+    const durationMinutes = Math.round(Number(hours) * 60);
+    try {
+      if (!Number.isFinite(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440) throw new Error("Enter a duration from 1 minute to 24 hours");
+      await createProjectTimeEntry(projectId, { taskId, workDate: new Date(`${workDate}T12:00:00`).toISOString(), durationMinutes, note }, token);
+      setHours("1"); setNote(""); await load();
+    } catch (err: any) { setError(err.message || "Could not record time"); }
+    finally { setSaving(false); }
+  };
+  const remove = async (entryId: string) => {
+    setError(null);
+    try { await deleteProjectTimeEntry(projectId, entryId, token); await load(); }
+    catch (err: any) { setError(err.message || "Could not delete time entry"); }
+  };
+  const totalMinutes = entries.reduce((sum, entry) => sum + entry.durationMinutes, 0);
+  const formatDuration = (minutes: number) => `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ""}`;
+  return <section className="space-y-4 pt-1">
+    <div><h4 className="text-sm font-bold text-slate-900">Record work time</h4><p className="mt-1 text-xs text-slate-500">Log time against a task in this project. Your entries are visible to project members and managers.</p></div>
+    {error && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</div>}
+    {tasks.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-xs text-slate-500">Add or assign a task in this project before recording time.</p> : <form onSubmit={submit} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <label className="space-y-1 text-[11px] font-semibold text-slate-600 lg:col-span-2">Task<select required className={projectFieldClass} value={taskId} onChange={(e) => setTaskId(e.target.value)}><option value="">Select a task</option>{tasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}</select></label>
+      <label className="space-y-1 text-[11px] font-semibold text-slate-600">Work date<input required type="date" className={projectFieldClass} value={workDate} onChange={(e) => setWorkDate(e.target.value)} /></label>
+      <label className="space-y-1 text-[11px] font-semibold text-slate-600">Hours<input required type="number" min="0.02" max="24" step="0.25" className={projectFieldClass} value={hours} onChange={(e) => setHours(e.target.value)} /></label>
+      <label className="space-y-1 text-[11px] font-semibold text-slate-600 sm:col-span-2 lg:col-span-3">Work note (optional)<input maxLength={1000} className={projectFieldClass} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What did you work on?" /></label>
+      <div className="flex items-end"><Button type="submit" size="sm" isLoading={saving}>Record time</Button></div>
+    </form>}
+    <div className="flex items-center justify-between"><h4 className="text-sm font-bold text-slate-900">Time entries <span className="font-normal text-slate-400">({entries.length})</span></h4><span className="text-xs font-semibold text-slate-600">Total: {formatDuration(totalMinutes)}</span></div>
+    {loading ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-500">Loading time entries…</p> : entries.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500">No work time has been recorded for this project.</p> : <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table className="w-full min-w-[660px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3">Date</th><th className="px-3 py-3">Person</th><th className="px-3 py-3">Task</th><th className="px-3 py-3">Time</th><th className="px-3 py-3">Note</th><th /></tr></thead><tbody className="divide-y divide-slate-100">{entries.map((entry) => <tr key={entry.id}><td className="whitespace-nowrap px-3 py-3 text-slate-600">{new Date(entry.workDate).toLocaleDateString()}</td><td className="px-3 py-3 text-slate-700">{entry.user?.name || "Unknown"}</td><td className="max-w-[180px] truncate px-3 py-3 text-slate-700">{entry.task?.title || "Deleted task"}</td><td className="px-3 py-3 font-semibold text-slate-800">{formatDuration(entry.durationMinutes)}</td><td className="max-w-[220px] truncate px-3 py-3 text-slate-500">{entry.note || "—"}</td><td className="px-3 py-3 text-right">{(entry.userId === userId || canManage) && <button type="button" onClick={() => void remove(entry.id)} className="text-rose-600 hover:text-rose-800">Delete</button>}</td></tr>)}</tbody></table></div>}
+  </section>;
 };
