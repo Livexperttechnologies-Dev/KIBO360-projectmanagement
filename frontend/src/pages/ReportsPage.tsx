@@ -36,6 +36,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
+import { TablePagination } from "../components/ui/TablePagination";
 
 type ReportTab = "PROJECTS" | "TASKS" | "WORKLOAD";
 
@@ -47,6 +48,10 @@ export const ReportsPage: React.FC = () => {
   const [departmentId, setDepartmentId] = useState<string>("all");
   const [projectId, setProjectId] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<ReportTab>("PROJECTS");
+  const [projectsPage, setProjectsPage] = useState(1);
+  const [employeesPage, setEmployeesPage] = useState(1);
+  const [deadlinesPage, setDeadlinesPage] = useState(1);
+  const [reportPageSize, setReportPageSize] = useState(8);
 
   // Data States
   const [kpis, setKPIs] = useState<ManagementKPIs | null>(null);
@@ -66,6 +71,12 @@ export const ReportsPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const canExport = user?.role === "ADMINISTRATOR" || user?.role === "MANAGER" || user?.role === "TEAM_LEAD";
+  const projectRows = projectReport?.projects || [];
+  const employeeRows = employeeReport?.employees || [];
+  const deadlineRows = upcomingReport?.tasks || [];
+  const visibleProjectRows = projectRows.slice((projectsPage - 1) * reportPageSize, projectsPage * reportPageSize);
+  const visibleEmployeeRows = employeeRows.slice((employeesPage - 1) * reportPageSize, employeesPage * reportPageSize);
+  const visibleDeadlineRows = deadlineRows.slice((deadlinesPage - 1) * reportPageSize, deadlinesPage * reportPageSize);
 
   useEffect(() => {
     if (token) {
@@ -486,7 +497,7 @@ export const ReportsPage: React.FC = () => {
                         </td>
                       </tr>
                     ) : (
-                      projectReport?.projects.map((p) => (
+                      visibleProjectRows.map((p) => (
                         <tr key={p.id} className="hover:bg-slate-50/60">
                           <td className="px-5 py-3.5">
                             <div className="flex items-center gap-2">
@@ -543,6 +554,7 @@ export const ReportsPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+              {!loading && projectRows.length > 0 && <TablePagination page={projectsPage} pageSize={reportPageSize} total={projectRows.length} onPageChange={setProjectsPage} onPageSizeChange={(size) => { setReportPageSize(size); setProjectsPage(1); setEmployeesPage(1); }} />}
             </CardContent>
           </Card>
         </div>
@@ -605,7 +617,7 @@ export const ReportsPage: React.FC = () => {
                           </td>
                         </tr>
                       ) : (
-                        upcomingReport?.tasks.map((task) => (
+                        visibleDeadlineRows.map((task) => (
                           <tr key={task.id} className="hover:bg-slate-50/60">
                             <td className="px-5 py-3 font-semibold text-slate-900 max-w-xs truncate">
                               {task.title}
@@ -636,6 +648,7 @@ export const ReportsPage: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
+              {deadlineRows.length > 0 && <TablePagination page={deadlinesPage} pageSize={reportPageSize} total={deadlineRows.length} onPageChange={setDeadlinesPage} onPageSizeChange={(size) => { setReportPageSize(size); setProjectsPage(1); setEmployeesPage(1); setDeadlinesPage(1); }} />}
               </CardContent>
             </Card>
           </div>
@@ -745,7 +758,7 @@ export const ReportsPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
-                    {employeeReport?.employees.map((emp) => (
+                    {visibleEmployeeRows.map((emp) => (
                       <tr key={emp.userId} className="hover:bg-slate-50/60">
                         <td className="px-5 py-3.5">
                           <div>
@@ -774,6 +787,7 @@ export const ReportsPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+              {employeeRows.length > 0 && <TablePagination page={employeesPage} pageSize={reportPageSize} total={employeeRows.length} onPageChange={setEmployeesPage} onPageSizeChange={(size) => { setReportPageSize(size); setProjectsPage(1); setEmployeesPage(1); }} />}
             </CardContent>
           </Card>
         </div>

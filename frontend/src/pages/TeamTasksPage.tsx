@@ -26,6 +26,7 @@ import { fetchProjects, ProjectItem } from "../api/project";
 import { fetchUsers } from "../api/user";
 import { CreateTaskModal } from "../components/tasks/CreateTaskModal";
 import { TaskDetailModal } from "../components/tasks/TaskDetailModal";
+import { TablePagination } from "../components/ui/TablePagination";
 
 const KANBAN_COLUMNS = [
   { key: "OPEN", label: "Open", color: "border-slate-300", bg: "bg-slate-50" },
@@ -69,7 +70,7 @@ export const TeamTasksPage: React.FC = () => {
   const [selectedPriority, setSelectedPriority] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
   const [totalCount, setTotalCount] = useState(0);
 
   // Modals
@@ -91,6 +92,7 @@ export const TeamTasksPage: React.FC = () => {
     selectedPriority,
     selectedStatus,
     page,
+    pageSize,
   ]);
 
   useEffect(() => {
@@ -119,7 +121,7 @@ export const TeamTasksPage: React.FC = () => {
     try {
       const filters: TaskFilters = {
         page,
-        limit: viewMode === "kanban" ? 100 : 20,
+        limit: pageSize,
         isSubtask: "false", // Top-level view shows parent tasks by default
       };
 
@@ -132,7 +134,6 @@ export const TeamTasksPage: React.FC = () => {
       const res = await fetchTasks(filters, token);
       setTasks(res.tasks);
       setTotalCount(res.pagination.total);
-      setTotalPages(res.pagination.totalPages);
     } catch (err: any) {
       setError(err.message || "Failed to load tasks");
     } finally {
@@ -257,13 +258,13 @@ export const TeamTasksPage: React.FC = () => {
               <input
                 type="text"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 placeholder="Search tasks by title, list, or description..."
                 className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:border-[#690BA8] focus:ring-1 focus:ring-[#690BA8]"
               />
               {search && (
                 <button
-                  onClick={() => setSearch("")}
+                  onClick={() => { setSearch(""); setPage(1); }}
                   className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
                 >
                   <X className="h-4 w-4" />
@@ -492,6 +493,9 @@ export const TeamTasksPage: React.FC = () => {
               </div>
             );
           })}
+          <div className="col-span-full overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <TablePagination page={page} pageSize={pageSize} total={totalCount} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
+          </div>
         </div>
       ) : (
         /* LIST VIEW */
@@ -598,33 +602,7 @@ export const TeamTasksPage: React.FC = () => {
                 </tbody>
               </table>
             </div>
-
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between p-4 border-t border-slate-100 text-xs">
-                <span className="text-slate-500">
-                  Page {page} of {totalPages}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={page <= 1}
-                    onClick={() => setPage(page - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={page >= totalPages}
-                    onClick={() => setPage(page + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            )}
+            <TablePagination page={page} pageSize={pageSize} total={totalCount} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
           </CardContent>
         </Card>
       )}

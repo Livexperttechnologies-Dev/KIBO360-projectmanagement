@@ -20,6 +20,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Input } from "../../components/ui/Input";
 import { Modal } from "../../components/ui/Modal";
+import { TablePagination } from "../../components/ui/TablePagination";
 import { Spinner } from "../../components/ui/Spinner";
 import { useAuth, Role, User } from "../../contexts/AuthContext";
 import { API_BASE_URL } from "../../api/client";
@@ -39,6 +40,8 @@ export const UserManagementPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>("");
   const [deptFilter, setDeptFilter] = useState<string>("all");
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersPageSize, setUsersPageSize] = useState(8);
 
   // Super-admin direct user creation state
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
@@ -273,6 +276,7 @@ export const UserManagementPage: React.FC = () => {
     if (deptFilter === "inactive") return matchesSearch && !u.isActive;
     return matchesSearch && u.department?.code === deptFilter;
   });
+  const paginatedUsers = filteredUsers.slice((usersPage - 1) * usersPageSize, usersPage * usersPageSize);
 
   const activeCount = users.filter((u) => u.isActive).length;
   const swCount = users.filter((u) => u.department?.code === "SOFTWARE_IT").length;
@@ -375,7 +379,7 @@ export const UserManagementPage: React.FC = () => {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setDeptFilter(tab.id)}
+              onClick={() => { setDeptFilter(tab.id); setUsersPage(1); }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 deptFilter === tab.id
                   ? "bg-[#7200A5] text-white shadow-sm"
@@ -393,7 +397,7 @@ export const UserManagementPage: React.FC = () => {
             type="text"
             placeholder="Search by name or email..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setUsersPage(1); }}
             className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-[#690BA8] focus:outline-none focus:ring-1 focus:ring-[#690BA8]"
           />
         </div>
@@ -424,7 +428,7 @@ export const UserManagementPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredUsers.map((u) => {
+                  {paginatedUsers.map((u) => {
                     const initials =
                       (u.profile?.firstName?.[0] || "") + (u.profile?.lastName?.[0] || u.email[0].toUpperCase());
 
@@ -544,6 +548,7 @@ export const UserManagementPage: React.FC = () => {
               </table>
             </div>
           )}
+          {!isLoading && filteredUsers.length > 0 && <TablePagination page={usersPage} pageSize={usersPageSize} total={filteredUsers.length} onPageChange={setUsersPage} onPageSizeChange={(size) => { setUsersPageSize(size); setUsersPage(1); }} />}
         </CardContent>
       </Card>
 

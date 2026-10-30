@@ -32,6 +32,7 @@ import { Card, CardContent } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { NotificationPreferencesModal } from "../components/notifications/NotificationPreferencesModal";
+import { TablePagination } from "../components/ui/TablePagination";
 
 type FilterTab = "ALL" | "UNREAD" | "ASSIGNMENTS" | "DEADLINES" | "BLOCKERS" | "REVIEWS" | "MILESTONES";
 
@@ -47,11 +48,14 @@ export const NotificationsPage: React.FC = () => {
   // Background jobs state (Admin / Lead)
   const [showJobsSection, setShowJobsSection] = useState<boolean>(false);
   const [jobs, setJobs] = useState<BackgroundJobItem[]>([]);
+  const [jobsPage, setJobsPage] = useState(1);
+  const [jobsPageSize, setJobsPageSize] = useState(8);
   const [jobsLoading, setJobsLoading] = useState<boolean>(false);
   const [workerRunning, setWorkerRunning] = useState<boolean>(false);
   const [workerMessage, setWorkerMessage] = useState<string | null>(null);
 
   const canViewJobs = user?.role === "ADMINISTRATOR" || user?.role === "MANAGER" || user?.role === "TEAM_LEAD";
+  const visibleJobs = jobs.slice((jobsPage - 1) * jobsPageSize, jobsPage * jobsPageSize);
 
   useEffect(() => {
     if (!token) return;
@@ -364,7 +368,7 @@ export const NotificationsPage: React.FC = () => {
                       </td>
                     </tr>
                   ) : (
-                    jobs.slice(0, 8).map((job) => (
+                    visibleJobs.map((job) => (
                       <tr key={job.id} className="hover:bg-slate-50/60">
                         <td className="px-4 py-3 font-semibold text-slate-800">
                           {job.jobName}
@@ -413,6 +417,7 @@ export const NotificationsPage: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            {jobs.length > 0 && <TablePagination page={jobsPage} pageSize={jobsPageSize} total={jobs.length} onPageChange={setJobsPage} onPageSizeChange={(size) => { setJobsPageSize(size); setJobsPage(1); }} />}
           </CardContent>
         </Card>
       )}

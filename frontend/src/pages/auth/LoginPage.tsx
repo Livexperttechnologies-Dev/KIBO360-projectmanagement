@@ -31,7 +31,7 @@ const developerWaveColors = ["#7e36ff", "#b022ff", "#e02cff", "#902dff"];
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, savedEmail, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { login, savedEmail, isAuthenticated, isLoading: authLoading, user } = useAuth();
 
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -74,12 +74,15 @@ export const LoginPage: React.FC = () => {
   }, [savedEmail]);
 
   useEffect(() => {
-    // If already authenticated, redirect to destination or dashboard
+    // Restore the requested page only when the signed-in role can access it.
     if (isAuthenticated) {
-      const from = (location.state as any)?.from?.pathname || "/dashboard";
-      navigate(from, { replace: true });
+      const requestedPath = (location.state as any)?.from?.pathname;
+      const destination = requestedPath === "/users" && user?.role !== "ADMINISTRATOR"
+        ? "/dashboard"
+        : requestedPath || "/dashboard";
+      navigate(destination, { replace: true });
     }
-  }, [isAuthenticated, navigate, location]);
+  }, [isAuthenticated, navigate, location, user?.role]);
 
   const validate = (): boolean => {
     let isValid = true;
@@ -93,7 +96,7 @@ export const LoginPage: React.FC = () => {
     } else {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email.trim())) {
-        setEmailError("Please enter a valid company email address (e.g. name@livexpert.in)");
+        setEmailError("Please enter a valid company email address (e.g. user@livexperttechnologies.com)");
         isValid = false;
       }
     }
@@ -128,9 +131,6 @@ export const LoginPage: React.FC = () => {
         setGeneralError(result.challenge.message || "");
       } else if (!result.success) {
         setGeneralError(result.message || "Invalid email or password");
-      } else {
-        const from = (location.state as any)?.from?.pathname || "/dashboard";
-        navigate(from, { replace: true });
       }
     } finally {
       setIsSubmitting(false);
@@ -356,7 +356,7 @@ export const LoginPage: React.FC = () => {
                 label="Company Email"
                 type="email"
                 required
-                placeholder="name@livexpert.in"
+                placeholder="user@livexperttechnologies.com"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
@@ -499,7 +499,7 @@ export const LoginPage: React.FC = () => {
               label="Work Email"
               type="email"
               required
-              placeholder="name@livexpert.in"
+              placeholder="user@livexperttechnologies.com"
               value={forgotEmail}
               onChange={(e) => setForgotEmail(e.target.value)}
               leftIcon={<Mail className="h-4 w-4" />}

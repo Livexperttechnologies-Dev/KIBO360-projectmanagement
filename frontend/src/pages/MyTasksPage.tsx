@@ -18,6 +18,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { fetchTasks, updateTask, TaskItem } from "../api/task";
 import { CreateTaskModal } from "../components/tasks/CreateTaskModal";
 import { TaskDetailModal } from "../components/tasks/TaskDetailModal";
+import { TablePagination } from "../components/ui/TablePagination";
 
 export const MyTasksPage: React.FC = () => {
   const { user, token } = useAuth();
@@ -27,6 +28,8 @@ export const MyTasksPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<"all" | "active" | "completed">("active");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -43,7 +46,7 @@ export const MyTasksPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchTasks({ assigneeId: user.id, limit: 100 }, token);
+      const res = await fetchTasks({ assigneeId: user.id, limit: 200 }, token);
       setTasks(res.tasks);
     } catch (err: any) {
       setError(err.message || "Failed to load assigned tasks");
@@ -82,6 +85,7 @@ export const MyTasksPage: React.FC = () => {
     }
     return true;
   });
+  const paginatedTasks = filteredTasks.slice((page - 1) * pageSize, page * pageSize);
 
   const emptyState = search.trim() && tasks.length > 0
     ? {
@@ -140,7 +144,7 @@ export const MyTasksPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
           <button
-            onClick={() => setActiveTab("active")}
+            onClick={() => { setActiveTab("active"); setPage(1); }}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               activeTab === "active"
                 ? "bg-white text-[#690BA8] shadow-sm"
@@ -150,7 +154,7 @@ export const MyTasksPage: React.FC = () => {
             Active ({tasks.filter((t) => t.status !== "COMPLETED").length})
           </button>
           <button
-            onClick={() => setActiveTab("completed")}
+            onClick={() => { setActiveTab("completed"); setPage(1); }}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               activeTab === "completed"
                 ? "bg-white text-[#690BA8] shadow-sm"
@@ -160,7 +164,7 @@ export const MyTasksPage: React.FC = () => {
             Completed ({tasks.filter((t) => t.status === "COMPLETED").length})
           </button>
           <button
-            onClick={() => setActiveTab("all")}
+            onClick={() => { setActiveTab("all"); setPage(1); }}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               activeTab === "all"
                 ? "bg-white text-[#690BA8] shadow-sm"
@@ -176,7 +180,7 @@ export const MyTasksPage: React.FC = () => {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search deliverables..."
             className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:border-[#690BA8]"
           />
@@ -202,7 +206,7 @@ export const MyTasksPage: React.FC = () => {
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {filteredTasks.map((task) => (
+              {paginatedTasks.map((task) => (
                 <div
                   key={task.id}
                   onClick={() => handleOpenTask(task.id)}
@@ -282,6 +286,7 @@ export const MyTasksPage: React.FC = () => {
               ))}
             </div>
           )}
+          {!loading && filteredTasks.length > 0 && <TablePagination page={page} pageSize={pageSize} total={filteredTasks.length} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />}
         </CardContent>
       </Card>
 

@@ -24,6 +24,7 @@ import {
 import { Card, CardContent } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
+import { TablePagination } from "../components/ui/TablePagination";
 import { Input } from "../components/ui/Input";
 import { Modal } from "../components/ui/Modal";
 import { Spinner } from "../components/ui/Spinner";
@@ -1398,6 +1399,10 @@ const ProjectDashboard: React.FC<{
   tasks: TaskItem[];
   error: string | null;
 }> = ({ project, tasks, error }) => {
+  const [workloadPage, setWorkloadPage] = useState(1);
+  const [workloadPageSize, setWorkloadPageSize] = useState(8);
+  const [taskPage, setTaskPage] = useState(1);
+  const [taskPageSize, setTaskPageSize] = useState(8);
   const completedTasks = tasks.filter((task) => task.status === "COMPLETED").length;
   const inProgressTasks = tasks.filter((task) => ["IN_PROGRESS", "UNDER_REVIEW", "CHANGES_REQUIRED"].includes(task.status)).length;
   const overdueTasks = tasks.filter(
@@ -1453,6 +1458,9 @@ const ProjectDashboard: React.FC<{
   if (project.owner) {
     registerPerson(project.owner, "Project Owner");
   }
+  const workloadRows = [...people.values()].sort((a, b) => b.assigned - a.assigned);
+  const visibleWorkloadRows = workloadRows.slice((workloadPage - 1) * workloadPageSize, workloadPage * workloadPageSize);
+  const visibleTasks = tasks.slice((taskPage - 1) * taskPageSize, taskPage * taskPageSize);
 
   return (
     <div className="space-y-5 pt-1">
@@ -1553,7 +1561,7 @@ const ProjectDashboard: React.FC<{
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {[...people.values()].sort((a, b) => b.assigned - a.assigned).map((person) => (
+                  {visibleWorkloadRows.map((person) => (
                     <tr key={person.id} className="hover:bg-violet-50/40">
                       <td className="px-3 py-3">
                         <div className="font-semibold text-slate-800">{person.name}</div>
@@ -1569,6 +1577,7 @@ const ProjectDashboard: React.FC<{
                   ))}
                 </tbody>
               </table>
+              <TablePagination page={workloadPage} pageSize={workloadPageSize} total={workloadRows.length} onPageChange={setWorkloadPage} onPageSizeChange={(size) => { setWorkloadPageSize(size); setWorkloadPage(1); }} />
             </div>
           )}
         </section>
@@ -1587,7 +1596,7 @@ const ProjectDashboard: React.FC<{
                 <tr><th className="px-4 py-2">Task</th><th className="px-4 py-2">Assignee</th><th className="px-4 py-2">Reviewer</th><th className="px-4 py-2">Status</th><th className="px-4 py-2">Priority</th><th className="px-4 py-2">Progress</th><th className="px-4 py-2">Due date</th><th className="px-4 py-2">Related work</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {tasks.map((task) => (
+                {visibleTasks.map((task) => (
                   <tr key={task.id}>
                     <td className="max-w-64 truncate px-4 py-2.5 font-semibold text-slate-800">{task.title}</td>
                     <td className="px-4 py-2.5 text-slate-600">{task.assignee?.name || "Unassigned"}</td>
@@ -1603,6 +1612,7 @@ const ProjectDashboard: React.FC<{
                 ))}
               </tbody>
             </table>
+            <TablePagination page={taskPage} pageSize={taskPageSize} total={tasks.length} onPageChange={setTaskPage} onPageSizeChange={(size) => { setTaskPageSize(size); setTaskPage(1); }} />
           </div>
         )}
       </section>
@@ -1611,8 +1621,11 @@ const ProjectDashboard: React.FC<{
 };
 
 const ProjectTasksPanel: React.FC<{ tasks: TaskItem[]; error: string | null }> = ({ tasks, error }) => {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
+  const visibleTasks = tasks.slice((page - 1) * pageSize, page * pageSize);
   const taskGroups = Array.from(
-    tasks.reduce((groups, task) => {
+    visibleTasks.reduce((groups, task) => {
       const groupName = task.taskList?.trim() || "General";
       const group = groups.get(groupName) || [];
       group.push(task);
@@ -1635,6 +1648,7 @@ const ProjectTasksPanel: React.FC<{ tasks: TaskItem[]; error: string | null }> =
         {tasks.length === 0 ? (
           <p className="p-8 text-center text-xs text-slate-500">No tasks have been added to this project.</p>
         ) : (
+          <>
           <div className="max-h-[60vh] overflow-auto">
             <table className="w-full min-w-[1120px] text-left text-xs">
               <thead className="sticky top-0 z-10 border-b border-violet-100 bg-[#faf8fc] text-[10px] uppercase tracking-wide text-slate-500">
@@ -1685,6 +1699,8 @@ const ProjectTasksPanel: React.FC<{ tasks: TaskItem[]; error: string | null }> =
               ))}
             </table>
           </div>
+          <TablePagination page={page} pageSize={pageSize} total={tasks.length} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
+          </>
         )}
       </div>
     </section>
@@ -1696,6 +1712,8 @@ const ProjectUsersPanel: React.FC<{
   tasks: TaskItem[];
   employees: { id: string; name: string; email: string }[];
 }> = ({ project, tasks, employees }) => {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
   type Person = { id: string; name: string; email?: string; roles: string[]; assigned: number; assignedBy: number; reviewed: number; completed: number };
   const people = new Map<string, Person>();
   const addPerson = (person: { id: string; name: string; email?: string }, role: string) => {
@@ -1721,6 +1739,8 @@ const ProjectUsersPanel: React.FC<{
   }
 
   const contributors = Array.from(people.values()).filter((person) => person.assigned > 0 || person.assignedBy > 0 || person.reviewed > 0);
+  const peopleRows = Array.from(people.values()).sort((a, b) => (b.assigned + b.assignedBy) - (a.assigned + a.assignedBy));
+  const visiblePeople = peopleRows.slice((page - 1) * pageSize, page * pageSize);
   return (
     <section className="space-y-4 pt-1">
       <div className="flex items-center justify-between">
@@ -1753,7 +1773,7 @@ const ProjectUsersPanel: React.FC<{
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {Array.from(people.values()).sort((a, b) => (b.assigned + b.assignedBy) - (a.assigned + a.assignedBy)).map((person) => (
+                {visiblePeople.map((person) => (
                   <tr key={person.id} className="hover:bg-violet-50/40">
                     <td className="px-4 py-3">
                       <div className="font-semibold text-slate-800">{person.name}</div>
@@ -1771,6 +1791,7 @@ const ProjectUsersPanel: React.FC<{
               </tbody>
             </table>
           </div>
+          <TablePagination page={page} pageSize={pageSize} total={peopleRows.length} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
         </div>
       )}
     </section>
@@ -1818,6 +1839,9 @@ const ProjectDocumentsPanel: React.FC<{
   token: string | null;
 }> = ({ documents, loading, error, token }) => {
   const [downloadError, setDownloadError] = React.useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
+  const visibleDocuments = documents.slice((page - 1) * pageSize, page * pageSize);
   const handleDownload = async (taskId: string, attachment: TaskAttachment) => {
     setDownloadError(null);
     try {
@@ -1839,7 +1863,8 @@ const ProjectDocumentsPanel: React.FC<{
       {loading ? <p className="rounded-xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-500">Loading project documents…</p> : documents.length === 0 ? <p className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500">No task attachments are available for this project.</p> : (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto_auto] gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-slate-500"><span>File</span><span>Task</span><span>Size</span><span /></div>
-          {documents.map(({ taskId, taskTitle, attachment }) => <div key={attachment.id} className="grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-0"><div className="min-w-0"><div className="truncate text-xs font-semibold text-slate-800">{attachment.filename}</div><div className="text-[10px] text-slate-400">{attachment.mimetype}</div></div><span className="truncate text-xs text-slate-600">{taskTitle}</span><span className="text-[11px] text-slate-500">{Math.max(1, Math.round(attachment.filesize / 1024))} KB</span><Button size="sm" variant="outline" onClick={() => void handleDownload(taskId, attachment)}>Download</Button></div>)}
+          {visibleDocuments.map(({ taskId, taskTitle, attachment }) => <div key={attachment.id} className="grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-0"><div className="min-w-0"><div className="truncate text-xs font-semibold text-slate-800">{attachment.filename}</div><div className="text-[10px] text-slate-400">{attachment.mimetype}</div></div><span className="truncate text-xs text-slate-600">{taskTitle}</span><span className="text-[11px] text-slate-500">{Math.max(1, Math.round(attachment.filesize / 1024))} KB</span><Button size="sm" variant="outline" onClick={() => void handleDownload(taskId, attachment)}>Download</Button></div>)}
+          <TablePagination page={page} pageSize={pageSize} total={documents.length} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
         </div>
       )}
     </section>
@@ -1850,6 +1875,8 @@ const projectFieldClass = "w-full rounded-lg border border-slate-200 bg-white px
 
 const ProjectIssuesPanel: React.FC<{ projectId: string; tasks: TaskItem[]; token: string | null; canManage: boolean }> = ({ projectId, tasks, token, canManage }) => {
   const [issues, setIssues] = useState<ProjectIssueItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [taskId, setTaskId] = useState("");
@@ -1857,6 +1884,7 @@ const ProjectIssuesPanel: React.FC<{ projectId: string; tasks: TaskItem[]; token
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const visibleIssues = issues.slice((page - 1) * pageSize, page * pageSize);
 
   const load = async () => {
     setError(null);
@@ -1893,7 +1921,7 @@ const ProjectIssuesPanel: React.FC<{ projectId: string; tasks: TaskItem[]; token
       <div className="sm:col-span-2"><Button type="submit" size="sm" isLoading={saving}>Submit issue</Button></div>
     </form>
     <div><h4 className="mb-2 text-sm font-bold text-slate-900">Project issues <span className="font-normal text-slate-400">({issues.length})</span></h4>
-      {loading ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-500">Loading issues…</p> : issues.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500">No issues have been reported for this project.</p> : <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table className="w-full min-w-[720px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3">Issue</th><th className="px-3 py-3">Task</th><th className="px-3 py-3">Priority</th><th className="px-3 py-3">Reported by</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Date</th></tr></thead><tbody className="divide-y divide-slate-100">{issues.map((issue) => <tr key={issue.id}><td className="max-w-xs px-3 py-3"><div className="font-semibold text-slate-800">{issue.title}</div>{issue.description && <div className="mt-1 line-clamp-2 text-[11px] text-slate-500">{issue.description}</div>}</td><td className="px-3 py-3 text-slate-600">{issue.task?.title || "—"}</td><td className="px-3 py-3">{issue.priority}</td><td className="px-3 py-3 text-slate-600">{issue.reporter?.name || "Unknown"}</td><td className="px-3 py-3">{canManage ? <select aria-label={`Status for ${issue.title}`} className={projectFieldClass} value={issue.status} onChange={(e) => void changeStatus(issue, e.target.value as ProjectIssueItem["status"])}>{["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"].map((value) => <option key={value} value={value}>{value.replace("_", " ")}</option>)}</select> : <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700">{issue.status.replace("_", " ")}</span>}</td><td className="whitespace-nowrap px-3 py-3 text-slate-500">{new Date(issue.createdAt).toLocaleDateString()}</td></tr>)}</tbody></table></div>}
+      {loading ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-500">Loading issues…</p> : issues.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500">No issues have been reported for this project.</p> : <div className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3">Issue</th><th className="px-3 py-3">Task</th><th className="px-3 py-3">Priority</th><th className="px-3 py-3">Reported by</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Date</th></tr></thead><tbody className="divide-y divide-slate-100">{visibleIssues.map((issue) => <tr key={issue.id}><td className="max-w-xs px-3 py-3"><div className="font-semibold text-slate-800">{issue.title}</div>{issue.description && <div className="mt-1 line-clamp-2 text-[11px] text-slate-500">{issue.description}</div>}</td><td className="px-3 py-3 text-slate-600">{issue.task?.title || "—"}</td><td className="px-3 py-3">{issue.priority}</td><td className="px-3 py-3 text-slate-600">{issue.reporter?.name || "Unknown"}</td><td className="px-3 py-3">{canManage ? <select aria-label={`Status for ${issue.title}`} className={projectFieldClass} value={issue.status} onChange={(e) => void changeStatus(issue, e.target.value as ProjectIssueItem["status"])}>{["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"].map((value) => <option key={value} value={value}>{value.replace("_", " ")}</option>)}</select> : <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700">{issue.status.replace("_", " ")}</span>}</td><td className="whitespace-nowrap px-3 py-3 text-slate-500">{new Date(issue.createdAt).toLocaleDateString()}</td></tr>)}</tbody></table></div><TablePagination page={page} pageSize={pageSize} total={issues.length} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} /></div>}
     </div>
   </section>;
 };
@@ -1901,6 +1929,8 @@ const ProjectIssuesPanel: React.FC<{ projectId: string; tasks: TaskItem[]; token
 const ProjectTimeLogsPanel: React.FC<{ projectId: string; tasks: TaskItem[]; token: string | null; userId: string; canManage: boolean }> = ({ projectId, tasks, token, userId, canManage }) => {
   const today = new Date().toISOString().slice(0, 10);
   const [entries, setEntries] = useState<ProjectTimeEntryItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
   const [taskId, setTaskId] = useState("");
   const [workDate, setWorkDate] = useState(today);
   const [hours, setHours] = useState("1");
@@ -1931,6 +1961,7 @@ const ProjectTimeLogsPanel: React.FC<{ projectId: string; tasks: TaskItem[]; tok
     catch (err: any) { setError(err.message || "Could not delete time entry"); }
   };
   const totalMinutes = entries.reduce((sum, entry) => sum + entry.durationMinutes, 0);
+  const visibleEntries = entries.slice((page - 1) * pageSize, page * pageSize);
   const formatDuration = (minutes: number) => `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ""}`;
   return <section className="space-y-4 pt-1">
     <div><h4 className="text-sm font-bold text-slate-900">Record work time</h4><p className="mt-1 text-xs text-slate-500">Log time against a task in this project. Your entries are visible to project members and managers.</p></div>
@@ -1943,6 +1974,6 @@ const ProjectTimeLogsPanel: React.FC<{ projectId: string; tasks: TaskItem[]; tok
       <div className="flex items-end"><Button type="submit" size="sm" isLoading={saving}>Record time</Button></div>
     </form>}
     <div className="flex items-center justify-between"><h4 className="text-sm font-bold text-slate-900">Time entries <span className="font-normal text-slate-400">({entries.length})</span></h4><span className="text-xs font-semibold text-slate-600">Total: {formatDuration(totalMinutes)}</span></div>
-    {loading ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-500">Loading time entries…</p> : entries.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500">No work time has been recorded for this project.</p> : <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table className="w-full min-w-[660px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3">Date</th><th className="px-3 py-3">Person</th><th className="px-3 py-3">Task</th><th className="px-3 py-3">Time</th><th className="px-3 py-3">Note</th><th /></tr></thead><tbody className="divide-y divide-slate-100">{entries.map((entry) => <tr key={entry.id}><td className="whitespace-nowrap px-3 py-3 text-slate-600">{new Date(entry.workDate).toLocaleDateString()}</td><td className="px-3 py-3 text-slate-700">{entry.user?.name || "Unknown"}</td><td className="max-w-[180px] truncate px-3 py-3 text-slate-700">{entry.task?.title || "Deleted task"}</td><td className="px-3 py-3 font-semibold text-slate-800">{formatDuration(entry.durationMinutes)}</td><td className="max-w-[220px] truncate px-3 py-3 text-slate-500">{entry.note || "—"}</td><td className="px-3 py-3 text-right">{(entry.userId === userId || canManage) && <button type="button" onClick={() => void remove(entry.id)} className="text-rose-600 hover:text-rose-800">Delete</button>}</td></tr>)}</tbody></table></div>}
+    {loading ? <p className="rounded-xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-500">Loading time entries…</p> : entries.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-500">No work time has been recorded for this project.</p> : <div className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="overflow-x-auto"><table className="w-full min-w-[660px] text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3">Date</th><th className="px-3 py-3">Person</th><th className="px-3 py-3">Task</th><th className="px-3 py-3">Time</th><th className="px-3 py-3">Note</th><th /></tr></thead><tbody className="divide-y divide-slate-100">{visibleEntries.map((entry) => <tr key={entry.id}><td className="whitespace-nowrap px-3 py-3 text-slate-600">{new Date(entry.workDate).toLocaleDateString()}</td><td className="px-3 py-3 text-slate-700">{entry.user?.name || "Unknown"}</td><td className="max-w-[180px] truncate px-3 py-3 text-slate-700">{entry.task?.title || "Deleted task"}</td><td className="px-3 py-3 font-semibold text-slate-800">{formatDuration(entry.durationMinutes)}</td><td className="max-w-[220px] truncate px-3 py-3 text-slate-500">{entry.note || "—"}</td><td className="px-3 py-3 text-right">{(entry.userId === userId || canManage) && <button type="button" onClick={() => void remove(entry.id)} className="text-rose-600 hover:text-rose-800">Delete</button>}</td></tr>)}</tbody></table></div><TablePagination page={page} pageSize={pageSize} total={entries.length} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} /></div>}
   </section>;
 };

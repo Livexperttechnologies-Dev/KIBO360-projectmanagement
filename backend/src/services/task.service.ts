@@ -210,7 +210,7 @@ export class TaskService {
 
     const total = tasks.length;
     const page = Math.max(1, Number(filters.page) || 1);
-    const limit = Math.max(1, Math.min(100, Number(filters.limit) || 50));
+    const limit = Math.max(1, Math.min(200, Number(filters.limit) || 50));
     const totalPages = Math.ceil(total / limit) || 1;
     const startIndex = (page - 1) * limit;
     const paginatedTasks = tasks.slice(startIndex, startIndex + limit);
