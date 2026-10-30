@@ -229,7 +229,7 @@ export const DashboardPage: React.FC = () => {
                               </div>
                               <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
                                 <div
-                                  className="h-full rounded-full bg-gradient-to-r from-[#690BA8] to-[#E81778]"
+                                  className="h-full rounded-full bg-[#7200A5]"
                                   style={{ width: `${p.progress}%` }}
                                 />
                               </div>

@@ -94,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         className={({ isActive }) =>
           `group flex min-h-10 items-center rounded-xl py-2 text-[13px] font-semibold transition-all duration-150 ${isCollapsed ? "justify-center px-0" : "justify-between px-3.5"} ${
             isActive
-              ? "bg-[#bb3b78] text-white shadow-[0_5px_18px_rgba(187,59,120,0.2)]"
+              ? "bg-[#7200A5] text-white shadow-[0_5px_18px_rgba(114,0,165,0.2)]"
               : "text-[#e7dce9] hover:bg-white/[0.07] hover:text-white"
           }`
         }

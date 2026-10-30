@@ -243,7 +243,7 @@ export const ReportsPage: React.FC = () => {
                   onClick={() => setDateRange(p.value as any)}
                   className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all whitespace-nowrap ${
                     dateRange === p.value
-                      ? "bg-[#690BA8] text-white shadow-sm"
+                      ? "bg-[#7200A5] text-white shadow-sm"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200/70"
                   }`}
                 >
@@ -521,7 +521,7 @@ export const ReportsPage: React.FC = () => {
                             </div>
                             <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
                               <div
-                                className="h-full rounded-full bg-gradient-to-r from-[#690BA8] to-[#00A896]"
+                                className="h-full rounded-full bg-[#7200A5]"
                                 style={{ width: `${p.progressPercentage}%` }}
                               />
                             </div>
@@ -568,7 +568,7 @@ export const ReportsPage: React.FC = () => {
                     </div>
                     <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-[#690BA8]"
+                        className="h-full rounded-full bg-[#7200A5]"
                         style={{ width: `${item.percentage}%` }}
                       />
                     </div>

@@ -81,7 +81,7 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                 <span
                   className={`text-xs font-black px-2 py-0.5 rounded-full ${
                     isToday
-                      ? "bg-[#690BA8] text-white"
+                      ? "bg-[#7200A5] text-white"
                       : "bg-slate-200/80 text-slate-700"
                   }`}
                 >
@@ -181,7 +181,7 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                           </div>
                           <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
                             <div
-                              className="bg-[#690BA8] h-1 rounded-full"
+                              className="bg-[#7200A5] h-1 rounded-full"
                               style={{ width: `${ev.completionPercentage}%` }}
                             />
                           </div>

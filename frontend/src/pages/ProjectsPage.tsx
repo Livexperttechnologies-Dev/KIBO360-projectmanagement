@@ -647,7 +647,7 @@ export const ProjectsPage: React.FC = () => {
                   </div>
                   <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-[#690BA8] via-[#E81778] to-[#F16A65] transition-all duration-300"
+                      className="h-full rounded-full bg-[#7200A5] transition-all duration-300"
                       style={{ width: `${Math.min(100, Math.max(0, p.progress))}%` }}
                     />
                   </div>

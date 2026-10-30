@@ -378,7 +378,7 @@ export const UserManagementPage: React.FC = () => {
               onClick={() => setDeptFilter(tab.id)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 deptFilter === tab.id
-                  ? "bg-[#690BA8] text-white shadow-sm"
+                  ? "bg-[#7200A5] text-white shadow-sm"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
               }`}
             >
@@ -432,7 +432,7 @@ export const UserManagementPage: React.FC = () => {
                       <tr key={u.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-[#690BA8] to-[#E81778] text-white font-bold text-xs shrink-0">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#7200A5] text-white font-bold text-xs shrink-0">
                               {initials}
                             </div>
                             <div>
@@ -686,7 +686,6 @@ export const UserManagementPage: React.FC = () => {
                 onChange={(event) => setEditRole(event.target.value as Role)}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-800 focus:border-[#690BA8] focus:outline-none"
               >
-                <option value="ADMINISTRATOR">Administrator</option>
                 <option value="MANAGER">Manager</option>
                 <option value="TEAM_LEAD">Team Lead</option>
                 <option value="EMPLOYEE">Employee</option>

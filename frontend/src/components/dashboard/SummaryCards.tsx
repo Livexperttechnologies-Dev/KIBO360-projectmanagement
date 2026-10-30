@@ -119,7 +119,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({ summary, isLoading }
                 {card.subtext}
               </div>
             </CardContent>
-            <div className={`absolute inset-x-0 bottom-0 h-0.5 ${card.isAlert ? "bg-rose-400" : "bg-gradient-to-r from-[#690BA8]/70 via-[#B52BC2]/35 to-transparent"}`} />
+            <div className={`absolute inset-x-0 bottom-0 h-0.5 ${card.isAlert ? "bg-rose-400" : "bg-[#7200A5]"}`} />
           </Card>
         );
       })}

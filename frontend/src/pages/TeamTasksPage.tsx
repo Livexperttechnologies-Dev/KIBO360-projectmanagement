@@ -445,7 +445,7 @@ export const TeamTasksPage: React.FC = () => {
                         {task.completionPercentage > 0 && (
                           <div className="w-full bg-slate-100 rounded-full h-1 mt-2.5 overflow-hidden">
                             <div
-                              className="bg-[#690BA8] h-1 rounded-full"
+                              className="bg-[#7200A5] h-1 rounded-full"
                               style={{ width: `${task.completionPercentage}%` }}
                             />
                           </div>
@@ -546,7 +546,7 @@ export const TeamTasksPage: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <div className="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden">
                               <div
-                                className="bg-[#690BA8] h-1.5 rounded-full"
+                                className="bg-[#7200A5] h-1.5 rounded-full"
                                 style={{ width: `${task.completionPercentage}%` }}
                               />
                             </div>

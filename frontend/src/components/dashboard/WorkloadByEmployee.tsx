@@ -63,13 +63,7 @@ export const WorkloadByEmployee: React.FC<WorkloadByEmployeeProps> = ({ workload
 
                 <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-300 ${
-                      capacityPercentage > 80
-                        ? "bg-[#F16A65]"
-                        : capacityPercentage > 50
-                        ? "bg-[#E81778]"
-                        : "bg-[#690BA8]"
-                    }`}
+                    className="h-full rounded-full bg-[#7200A5] transition-all duration-300"
                     style={{ width: `${capacityPercentage}%` }}
                   />
                 </div>

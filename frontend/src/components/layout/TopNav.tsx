@@ -142,7 +142,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onMenuClick }) => {
     : "LX";
 
   return (
-    <header className="sticky top-0 z-30 flex h-20 w-full items-center justify-between border-b border-violet-100 bg-white/95 px-6 backdrop-blur-md">
+    <header className="sticky top-0 z-30 flex h-[68px] w-full items-center justify-between border-b border-violet-200/80 bg-[#FCFAFE]/95 px-5 backdrop-blur-md sm:px-6">
       {/* Left: Mobile Toggle & Page Title */}
       <div className="flex items-center gap-4">
         <button
@@ -153,10 +153,10 @@ export const TopNav: React.FC<TopNavProps> = ({ onMenuClick }) => {
           <Menu className="h-6 w-6" />
         </button>
         <div>
-          <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-base font-bold text-[#251330] tracking-tight">
             {getPageTitle()}
           </h1>
-          <p className="text-xs text-slate-400 font-medium">
+          <p className="text-[11px] text-slate-500 font-medium">
             KIBO360 Project Management Hub
           </p>
         </div>
@@ -237,7 +237,7 @@ export const TopNav: React.FC<TopNavProps> = ({ onMenuClick }) => {
         {user ? (
           <div className="flex items-center gap-3 border-l border-violet-100 pl-3">
             <Link to="/profile" className="flex items-center gap-2 rounded-lg p-1 hover:bg-slate-50" title="Open my profile">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-[#690BA8] to-[#E81778] text-white font-bold text-xs shadow-sm">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#7200A5] text-white font-bold text-xs shadow-sm">
                 {initials}
               </div>
               <div className="hidden text-left xl:block">

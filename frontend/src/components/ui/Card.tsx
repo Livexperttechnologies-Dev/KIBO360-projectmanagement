@@ -6,7 +6,7 @@ export const Card: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
   ...props
 }) => (
   <div
-    className={`rounded-2xl border border-violet-100/90 bg-white shadow-[0_2px_10px_rgba(78,35,112,0.045)] hover:shadow-[0_8px_24px_rgba(78,35,112,0.08)] transition-shadow duration-200 ${className}`}
+    className={`rounded-2xl border border-[#ead9e8] bg-white shadow-[0_2px_10px_rgba(61,20,57,0.045)] hover:shadow-[0_8px_24px_rgba(61,20,57,0.09)] transition-shadow duration-200 ${className}`}
     {...props}
   >
     {children}
@@ -19,7 +19,7 @@ export const CardHeader: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
   ...props
 }) => (
   <div
-    className={`flex flex-col space-y-1.5 p-5 pb-3 border-b border-violet-100/80 ${className}`}
+    className={`flex flex-col space-y-1.5 p-5 pb-3 border-b border-[#f0e3ef] ${className}`}
     {...props}
   >
     {children}
@@ -61,7 +61,7 @@ export const CardFooter: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
   ...props
 }) => (
   <div
-    className={`flex items-center p-5 pt-3 border-t border-violet-100/80 text-xs text-slate-500 ${className}`}
+    className={`flex items-center p-5 pt-3 border-t border-[#f0e3ef] text-xs text-slate-500 ${className}`}
     {...props}
   >
     {children}

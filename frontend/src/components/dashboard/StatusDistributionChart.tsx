@@ -9,12 +9,12 @@ interface StatusDistributionChartProps {
 }
 
 const statusColorMap: Record<string, { bg: string; fill: string; text: string }> = {
-  BACKLOG: { bg: "bg-slate-100", fill: "bg-slate-400", text: "text-slate-600" },
-  TODO: { bg: "bg-purple-50", fill: "bg-[#690BA8]", text: "text-[#690BA8]" },
-  IN_PROGRESS: { bg: "bg-pink-50", fill: "bg-[#E81778]", text: "text-[#E81778]" },
-  IN_REVIEW: { bg: "bg-amber-50", fill: "bg-amber-500", text: "text-amber-700" },
-  COMPLETED: { bg: "bg-emerald-50", fill: "bg-emerald-500", text: "text-emerald-700" },
-  CANCELLED: { bg: "bg-rose-50", fill: "bg-rose-400", text: "text-rose-600" },
+  BACKLOG: { bg: "bg-slate-100", fill: "bg-[#7200A5]", text: "text-slate-600" },
+  TODO: { bg: "bg-purple-50", fill: "bg-[#7200A5]", text: "text-[#690BA8]" },
+  IN_PROGRESS: { bg: "bg-pink-50", fill: "bg-[#7200A5]", text: "text-[#E81778]" },
+  IN_REVIEW: { bg: "bg-amber-50", fill: "bg-[#7200A5]", text: "text-amber-700" },
+  COMPLETED: { bg: "bg-emerald-50", fill: "bg-[#7200A5]", text: "text-emerald-700" },
+  CANCELLED: { bg: "bg-rose-50", fill: "bg-[#7200A5]", text: "text-rose-600" },
 };
 
 export const StatusDistributionChart: React.FC<StatusDistributionChartProps> = ({

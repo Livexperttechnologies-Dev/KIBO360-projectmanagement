@@ -32,15 +32,15 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantClasses = {
       primary:
-        "bg-[#690BA8] text-white hover:bg-[#340771] shadow-sm shadow-[#690BA8]/20 focus-visible:ring-2 focus-visible:ring-[#690BA8] focus-visible:ring-offset-2 active:scale-[0.99]",
+        "bg-[#7200A5] text-white hover:bg-[#62008F] shadow-sm shadow-[#7200A5]/20 focus-visible:ring-2 focus-visible:ring-[#7200A5] focus-visible:ring-offset-2 active:scale-[0.99]",
       gradient:
-        "bg-gradient-to-r from-[#690BA8] via-[#E81778] to-[#F16A65] text-white hover:opacity-95 shadow-md shadow-[#690BA8]/25 focus-visible:ring-2 focus-visible:ring-[#E81778] active:scale-[0.99]",
+        "bg-[#7200A5] text-white hover:bg-[#62008F] shadow-md shadow-[#7200A5]/25 focus-visible:ring-2 focus-visible:ring-[#7200A5] active:scale-[0.99]",
       secondary:
-        "bg-[#F5EFFB] text-[#690BA8] hover:bg-[#ede0f7] border border-[#690BA8]/20 focus-visible:ring-2 focus-visible:ring-[#690BA8]",
+        "bg-[#f5eafa] text-[#7200A5] hover:bg-[#edddf5] border border-[#7200A5]/20 focus-visible:ring-2 focus-visible:ring-[#7200A5]",
       outline:
-        "bg-white text-slate-700 hover:bg-[#FBF7FF] border border-violet-200 hover:border-violet-300 focus-visible:ring-2 focus-visible:ring-[#690BA8]",
+        "bg-white text-slate-700 hover:bg-[#fcf6fa] border border-[#ead9e8] hover:border-[#d7b8ce] focus-visible:ring-2 focus-visible:ring-[#bb3b78]",
       ghost:
-        "bg-transparent text-slate-600 hover:text-[#690BA8] hover:bg-violet-50/80",
+        "bg-transparent text-slate-600 hover:text-[#9e2d67] hover:bg-[#fcf4f9]",
       danger:
         "bg-rose-600 text-white hover:bg-rose-700 shadow-sm shadow-rose-600/20 focus-visible:ring-2 focus-visible:ring-rose-500",
     };

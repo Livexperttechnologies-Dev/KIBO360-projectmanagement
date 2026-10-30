@@ -124,7 +124,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                   onClick={() => onSelectDay(day.date)}
                   className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors ${
                     day.isToday
-                      ? "bg-[#690BA8] text-white hover:bg-[#520984]"
+                      ? "bg-[#7200A5] text-white hover:bg-[#62008F]"
                       : !day.isCurrentMonth
                       ? "text-slate-400"
                       : "text-slate-700"

@@ -295,7 +295,7 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
             type="button"
             onClick={handleSave}
             disabled={saving || loading}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#690BA8] to-[#E81778] px-5 py-2 text-xs font-bold text-white shadow-md hover:opacity-95 disabled:opacity-50 transition-opacity"
+            className="flex items-center gap-2 rounded-xl bg-[#7200A5] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-[#62008F] disabled:opacity-50 transition-colors"
           >
             {saving ? "Saving..." : "Save Preferences"}
           </button>

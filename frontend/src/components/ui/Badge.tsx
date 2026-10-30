@@ -19,10 +19,10 @@ export const Badge: React.FC<BadgeProps> = ({
   };
 
   const variantClasses = {
-    primary: "bg-[#F5EFFB] text-[#690BA8] border border-[#690BA8]/15",
+    primary: "bg-[#f5eafa] text-[#7200A5] border border-[#7200A5]/20",
     magenta: "bg-pink-50 text-[#E81778] border border-[#E81778]/20",
     coral: "bg-orange-50 text-[#F16A65] border border-[#F16A65]/20",
-    lavender: "bg-[#F5EFFB] text-[#340771] border border-purple-200",
+    lavender: "bg-[#f4edf3] text-[#6e244f] border border-[#d9bfd2]",
     success: "bg-emerald-50 text-emerald-700 border border-emerald-200",
     warning: "bg-amber-50 text-amber-700 border border-amber-200",
     neutral: "bg-slate-100 text-slate-700 border border-slate-200",
