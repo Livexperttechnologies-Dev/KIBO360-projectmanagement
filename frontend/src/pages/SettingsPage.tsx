@@ -6,14 +6,11 @@ import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { API_BASE_URL } from "../api/client";
 import { useAuth } from "../contexts/AuthContext";
-import { QRCodeSVG } from "qrcode.react";
 
 export const SettingsPage: React.FC = () => {
   const { token } = useAuth();
   const [twoFactor, setTwoFactor] = useState<any>(null);
-  const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
-  const [setup, setSetup] = useState<any>(null);
   const [notice, setNotice] = useState("");
   const isSuperAdmin = Boolean(twoFactor?.canManageEnforcement);
   const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
@@ -25,24 +22,12 @@ export const SettingsPage: React.FC = () => {
   };
   useEffect(() => { void loadTwoFactor(); }, [token]);
 
-  const startEnrollment = async () => {
-    setNotice("");
-    const response = await fetch(`${API_BASE_URL}/auth/two-factor/enrollment`, { method: "POST", headers, credentials: "include", body: JSON.stringify({ password }) });
-    const result = await response.json();
-    if (!response.ok) { setNotice(result?.error?.message || "Could not start authenticator setup"); return; }
-    setSetup(result.data);
-  };
-  const verifyEnrollment = async () => {
-    const response = await fetch(`${API_BASE_URL}/auth/two-factor/enrollment/verify`, { method: "POST", headers, credentials: "include", body: JSON.stringify({ password, authenticatorCode: code }) });
-    const result = await response.json();
-    setNotice(response.ok ? "Google Authenticator is connected." : result?.error?.message || "Code verification failed");
-    if (response.ok) { setSetup(null); setPassword(""); await loadTwoFactor(); }
-  };
   const toggleEnforcement = async () => {
+    if (twoFactor?.globalTwoFactorEnabled && !window.confirm("Turn off 2FA for all users? Users will no longer need the super admin’s authenticator code at sign-in or password reset.")) return;
     const response = await fetch(`${API_BASE_URL}/auth/two-factor/enforcement`, { method: "PUT", headers, credentials: "include", body: JSON.stringify({ enabled: !twoFactor?.globalTwoFactorEnabled, authenticatorCode: code }) });
     const result = await response.json();
-    setNotice(response.ok ? "Organization-wide Google Authenticator policy updated." : result?.error?.message || "Could not update policy");
-    if (response.ok) await loadTwoFactor();
+    setNotice(response.ok ? "Organization-wide Google Authenticator policy updated. Active sessions have been signed out." : result?.error?.message || "Could not update policy");
+    if (response.ok) { setCode(""); await loadTwoFactor(); }
   };
   return (
     <div className="space-y-6">
@@ -55,13 +40,14 @@ export const SettingsPage: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card className="md:col-span-2">
-          <CardHeader><div className="flex items-center gap-2"><Shield className="h-5 w-5 text-[#690BA8]" /><CardTitle>Google Authenticator</CardTitle></div><CardDescription>Organization-wide 2FA uses the super admin’s authenticator code for all user sign-ins and password resets.</CardDescription></CardHeader>
+          <CardHeader><div className="flex items-center gap-2"><Shield className="h-5 w-5 text-[#690BA8]" /><CardTitle>Google Authenticator</CardTitle></div><CardDescription>Manage whether all users must use the super admin’s authenticator at sign-in and password reset. Set up the authenticator from My Profile.</CardDescription></CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-slate-600">Organization-wide enforcement is {twoFactor?.globalTwoFactorEnabled ? "on" : "off"}. {isSuperAdmin ? `Your authenticator is ${twoFactor?.authenticatorEnrolled ? "connected" : "not connected"}.` : twoFactor?.usesSuperAdminAuthenticator ? `The super admin authenticator is ${twoFactor?.superAdminAuthenticatorEnrolled ? "active" : "not set up"}. Ask the super admin for the current code when signing in or resetting your password.` : ""}</p>
-            {!twoFactor?.usesSuperAdminAuthenticator && !twoFactor?.authenticatorEnrolled && <div className="flex gap-2"><Input label="Current password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} /><Button className="self-end" onClick={startEnrollment} disabled={!password}>Set up authenticator</Button></div>}
-            {setup && <div className="space-y-3 rounded-xl border border-purple-200 bg-purple-50 p-4 text-sm"><p>Scan this QR in Google Authenticator, or enter the key manually:</p><div className="flex justify-center rounded-lg bg-white p-4"><QRCodeSVG value={setup.otpauthUri} size={220} level="Q" includeMargin aria-label="Google Authenticator setup QR code" /></div><code className="block break-all font-mono">{setup.secret}</code><a className="text-[#690BA8] underline" href={setup.otpauthUri}>Open authenticator setup</a><Input label="6-digit code" inputMode="numeric" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} /><Button onClick={verifyEnrollment} disabled={!/^\d{6}$/.test(code) || !password}>Verify and finish setup</Button></div>}
-            {twoFactor?.authenticatorEnrolled && !twoFactor?.usesSuperAdminAuthenticator && <div className="flex items-end gap-2"><Input label="Current authenticator code" inputMode="numeric" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} /><Button onClick={toggleEnforcement} disabled={!isSuperAdmin || !/^\d{6}$/.test(code)}>{twoFactor?.globalTwoFactorEnabled ? "Turn off for everyone" : "Require for everyone"}</Button></div>}
-            {isSuperAdmin && <p className="text-xs text-slate-500">Only the super admin can turn organization-wide enforcement on or off. When enabled, all users must ask the super admin for the current authenticator code at each sign-in and password reset.</p>}
+            <p className="text-sm text-slate-600">Organization-wide enforcement is <strong>{twoFactor?.globalTwoFactorEnabled ? "on" : "off"}</strong>. {isSuperAdmin ? `Your authenticator is ${twoFactor?.authenticatorEnrolled ? "connected" : "not connected"}.` : twoFactor?.usesSuperAdminAuthenticator ? `The super admin authenticator is ${twoFactor?.superAdminAuthenticatorEnrolled ? "active" : "not set up"}.` : ""}</p>
+            {isSuperAdmin ? twoFactor?.authenticatorEnrolled ? <div className="max-w-xl space-y-3 rounded-xl border border-violet-100 bg-violet-50/50 p-4">
+              <p className="text-xs text-slate-600">{twoFactor.globalTwoFactorEnabled ? "All users are currently required to use your authenticator code at sign-in and password reset." : "Turn on enforcement to require your authenticator code from all users at sign-in and password reset."}</p>
+              <Input label="Current super admin authenticator code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} />
+              <Button variant={twoFactor.globalTwoFactorEnabled ? "danger" : "gradient"} onClick={toggleEnforcement} disabled={!/^\d{6}$/.test(code)}>{twoFactor.globalTwoFactorEnabled ? "Turn off 2FA for all users" : "Turn on 2FA for all users"}</Button>
+            </div> : <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Set up Google Authenticator in My Profile before you can change the organization-wide 2FA setting.</p> : twoFactor?.globalTwoFactorEnabled && <p className="text-xs text-slate-500">Ask the super admin for the current authenticator code when signing in or resetting your password.</p>}
             {notice && <p className="text-sm text-slate-700" role="status">{notice}</p>}
           </CardContent>
         </Card>

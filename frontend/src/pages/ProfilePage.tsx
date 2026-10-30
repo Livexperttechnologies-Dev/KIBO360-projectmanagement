@@ -71,26 +71,6 @@ export const ProfilePage: React.FC = () => {
     }
   };
 
-  const toggleOrganizationPolicy = async () => {
-    setLoading(true);
-    setNotice("");
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/two-factor/enforcement`, {
-        method: "PUT", headers, credentials: "include",
-        body: JSON.stringify({ enabled: !settings?.globalTwoFactorEnabled, authenticatorCode: code }),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result?.error?.message || "Could not change organization 2FA policy");
-      setCode("");
-      setNotice("Organization-wide 2FA policy updated. All active sessions have been signed out.");
-      await loadSettings();
-    } catch (error: any) {
-      setNotice(error.message || "Could not change organization 2FA policy");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
@@ -113,7 +93,7 @@ export const ProfilePage: React.FC = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-[#690BA8]" /><CardTitle>Google Authenticator</CardTitle></div>
-          <CardDescription>Set up your personal authenticator from your profile. Do this before enabling organization-wide enforcement.</CardDescription>
+          <CardDescription>Set up or replace the super admin authenticator here. Manage organization-wide enforcement from Settings.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-slate-600">Authenticator: <strong>{usesSharedSuperAdminCode ? (settings?.superAdminAuthenticatorEnrolled ? "Super admin authenticator active" : "Super admin setup required") : (settings?.authenticatorEnrolled ? "Connected" : "Not set up")}</strong></p>
@@ -123,7 +103,7 @@ export const ProfilePage: React.FC = () => {
 
           {!usesSharedSuperAdminCode && !setup && <div className="space-y-3">
             <Input label="Current password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} />
-            <Button onClick={beginSetup} isLoading={loading} disabled={password.length < 8} leftIcon={<KeyRound className="h-4 w-4" />}>
+            <Button onClick={beginSetup} isLoading={loading} disabled={!password} leftIcon={<KeyRound className="h-4 w-4" />}>
               {settings?.authenticatorEnrolled ? "Replace authenticator setup" : "Set up Google Authenticator"}
             </Button>
           </div>}
@@ -135,14 +115,6 @@ export const ProfilePage: React.FC = () => {
             <a className="inline-block text-sm font-semibold text-[#690BA8] underline" href={setup.otpauthUri}>Open in an authenticator app</a>
             <Input label="Current six-digit code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} helperText="Codes change every 30 seconds. Use the code shown for this KIBO360 entry." />
             <Button onClick={verifySetup} isLoading={loading} disabled={!/^\d{6}$/.test(code) || password.length < 8}>Verify authenticator</Button>
-          </div>}
-
-          {settings?.canManageEnforcement && settings?.authenticatorEnrolled && !setup && <div className="space-y-3 border-t border-slate-100 pt-4">
-            <p className="text-sm text-slate-600">Only the super admin can change this policy. When enabled, all users use the current code from the super admin’s authenticator at sign-in and password reset.</p>
-            <Input label="Fresh authenticator code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} />
-            <Button onClick={toggleOrganizationPolicy} isLoading={loading} disabled={!/^\d{6}$/.test(code)}>
-              {settings.globalTwoFactorEnabled ? "Turn off 2FA for everyone" : "Require 2FA for everyone"}
-            </Button>
           </div>}
 
           {notice && <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700" role="status">{notice}</p>}

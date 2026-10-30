@@ -444,7 +444,7 @@ export const LoginPage: React.FC = () => {
                 type="submit"
                 variant="gradient"
                 size="lg"
-                className="w-full mt-2"
+                className="w-full mt-2 text-sm"
                 isLoading={isSubmitting || authLoading}
                 rightIcon={<ArrowRight className="h-4 w-4" />}
               >
